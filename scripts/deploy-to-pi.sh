@@ -112,11 +112,12 @@ fi
 echo -e "${YELLOW}[4/5]${NC} Iniciando container..."
 ssh $PI_HOST "cd $PI_PATH && docker compose down 2>/dev/null || true && docker compose up -d"
 
-# Paso 5: Inicializar DB si es necesario (primer deploy o --seed)
+# Paso 5: Ejecutar seed si se solicita
 echo -e "${YELLOW}[5/5]${NC} Verificando base de datos..."
+# Migraciones se ejecutan automaticamente en el entrypoint del container
 if [ "$DO_SEED" = true ]; then
   echo -e "${BLUE}  Ejecutando seed...${NC}"
-  ssh $PI_HOST "docker exec $CONTAINER_NAME sh -c 'cd /app && npx prisma db push --schema=packages/database/prisma/schema.prisma && npx tsx packages/database/prisma/seed.ts'"
+  ssh $PI_HOST "docker exec $CONTAINER_NAME sh -c 'cd /app && npx tsx packages/database/prisma/seed.ts'"
 fi
 
 # Esperar a que el container esté healthy

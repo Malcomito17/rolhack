@@ -66,10 +66,15 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 
-# Copy Prisma schema and generated client
+# Copy Prisma schema, migrations, and generated client
 COPY --from=builder /app/packages/database/prisma ./packages/database/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
+# Copy entrypoint script
+COPY --from=builder /app/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
@@ -82,4 +87,4 @@ ENV PORT=3002
 ENV HOSTNAME="0.0.0.0"
 
 # Database will be mounted at /app/data/rolhack.db
-CMD ["node", "apps/web/server.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

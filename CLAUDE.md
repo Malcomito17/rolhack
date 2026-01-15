@@ -42,11 +42,12 @@ npm run format       # Format with prettier
 
 ### Database (from root)
 ```bash
-npm run db:generate  # Generate Prisma client
-npm run db:push      # Push schema to database (dev)
-npm run db:migrate   # Run migrations
-npm run db:studio    # Open Prisma Studio
-npm run db:seed      # Seed superadmin users
+npm run db:generate       # Generate Prisma client
+npm run db:migrate:dev    # Create new migration (dev only)
+npm run db:migrate:deploy # Apply migrations (prod)
+npm run db:migrate:status # Check migration status
+npm run db:studio         # Open Prisma Studio (dev only)
+npm run db:seed           # Seed superadmin + demo project (if SEED_DEMO=true)
 ```
 
 ## RBAC System
@@ -114,14 +115,28 @@ SUPERADMIN_EMAILS="your@email.com"
 
 ## Production Deployment
 
-Target: Raspberry Pi via Cloudflare Tunnel
+Target: Raspberry Pi via Docker + Cloudflare Tunnel
 
 | Config | Value |
 |--------|-------|
 | Port | 3002 |
 | Subdomain | rolhack.euforiateclog.cloud |
-| PM2 Process | rolhack |
-| DB Path | /mnt/ssd/projects/rolhack/packages/database/prisma/dev.db |
+| Container | `rolhack` (Docker) |
+| DB Volume | `rolhack-data` (Docker volume) |
+| Deploy | `./scripts/deploy-to-pi.sh` |
+
+### Deploy Commands
+```bash
+./scripts/deploy-to-pi.sh           # Deploy normal
+./scripts/deploy-to-pi.sh --build   # Force rebuild
+./scripts/deploy-to-pi.sh --seed    # Con seed de datos
+./scripts/deploy-to-pi.sh --logs    # Ver logs post-deploy
+```
+
+### SUPERADMIN Bootstrap
+Default: `euforiateclog@gmail.com` (configurable via `SUPERADMIN_EMAILS` env)
+
+Ver: `docs/production.md` y `docs/go-live-checklist.md`
 
 ## Engine Types & Contracts
 

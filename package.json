@@ -11,11 +11,12 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "db:generate": "turbo db:generate",
-    "db:push": "turbo db:push",
-    "db:migrate": "turbo db:migrate",
-    "db:seed": "cd packages/database && npx tsx prisma/seed.ts",
-    "db:studio": "pnpm --filter @rolhack/database db:studio",
+    "db:generate": "npm run db:generate --workspace=@rolhack/database",
+    "db:migrate:dev": "npm run db:migrate:dev --workspace=@rolhack/database",
+    "db:migrate:deploy": "npm run db:migrate:deploy --workspace=@rolhack/database",
+    "db:migrate:status": "npm run db:migrate:status --workspace=@rolhack/database",
+    "db:seed": "npm run db:seed --workspace=@rolhack/database",
+    "db:studio": "npm run db:studio --workspace=@rolhack/database",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
