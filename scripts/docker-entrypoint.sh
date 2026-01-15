@@ -11,7 +11,7 @@ echo "🚀 Starting RolHack..."
 # Run Prisma migrations
 echo "📦 Running database migrations..."
 cd /app
-npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+node node_modules/prisma/build/index.js migrate deploy --schema=packages/database/prisma/schema.prisma
 
 echo "✅ Migrations complete"
 
