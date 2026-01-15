@@ -1,0 +1,51 @@
+// =============================================================================
+// GET /api/runs/:runId - Get run details including state
+// =============================================================================
+
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { isSuperAdmin } from '@/lib/rbac'
+import { getRunInfo, canAccessRun, EngineError } from '@/lib/engine'
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ runId: string }> }
+) {
+  try {
+    // Auth check
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { runId } = await params
+    const user = session.user
+    const isAdmin = isSuperAdmin(user)
+
+    // Permission check
+    const canAccess = await canAccessRun(user.id, runId, isAdmin)
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'No tienes acceso a esta run' },
+        { status: 403 }
+      )
+    }
+
+    // Get run info
+    const runInfo = await getRunInfo(runId)
+
+    return NextResponse.json(runInfo)
+  } catch (error) {
+    console.error('[API] GET /api/runs/[runId] error:', error)
+
+    if (error instanceof EngineError) {
+      const status = error.code === 'NOT_FOUND' ? 404 : 400
+      return NextResponse.json({ error: error.message }, { status })
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

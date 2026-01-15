@@ -123,6 +123,102 @@ Target: Raspberry Pi via Cloudflare Tunnel
 | PM2 Process | rolhack |
 | DB Path | /mnt/ssd/projects/rolhack/packages/database/prisma/dev.db |
 
+## Engine Types & Contracts
+
+### ProjectDefinition.data (World Definition)
+```typescript
+interface ProjectData {
+  meta: {
+    name: string
+    version: string
+    description?: string
+    author?: string
+  }
+  circuits: CircuitDefinition[]
+}
+
+interface CircuitDefinition {
+  id: string
+  name: string
+  description?: string
+  nodes: NodeDefinition[]
+  links: LinkDefinition[]
+}
+
+interface NodeDefinition {
+  id: string                          // Unique within circuit
+  name: string
+  type: 'ENTRY' | 'NORMAL' | 'EXIT'
+  description?: string
+  solution?: number                   // Required unless type=ENTRY
+  failMode?: 'WARNING' | 'BLOQUEO'    // Default: WARNING
+}
+
+interface LinkDefinition {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  hidden: boolean                     // Default: false
+}
+```
+
+### Run.state (Execution State)
+```typescript
+interface RunState {
+  position: {
+    circuitId: string
+    nodeId: string
+  }
+  lastHackedNodeByCircuit: Record<string, string>  // circuitId -> nodeId
+  nodes: Record<string, {                          // nodeId -> state
+    hacked: boolean
+    blocked: boolean
+  }>
+  links: Record<string, {                          // linkId -> state
+    discovered: boolean
+  }>
+  warnings: Array<{
+    id: string
+    circuitId: string
+    nodeId: string
+    timestamp: string                              // ISO 8601
+    severity: 'INFO' | 'TRACE' | 'ALERT' | 'LOCKDOWN' | 'BLACK_ICE'
+    message: string
+  }>
+}
+```
+
+## Engine API Endpoints
+
+### Runs Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/projects/:projectId/runs` | Create new run |
+| GET | `/api/runs` | List user's runs (SUPERADMIN sees all) |
+| GET | `/api/runs/:runId` | Get run details with state |
+
+### Game Actions
+| Method | Endpoint | Body | Description |
+|--------|----------|------|-------------|
+| POST | `/api/runs/:runId/hack` | `{nodeId, inputValue}` | Attempt to hack a node |
+| POST | `/api/runs/:runId/move` | `{targetNodeId}` | Move to connected node |
+| POST | `/api/runs/:runId/discover` | - | Reveal hidden links from current position |
+
+### Engine Functions (`apps/web/src/lib/engine/`)
+```typescript
+// Core logic (engine.ts)
+initializeRunState(data: ProjectData): RunState
+attemptHack(state, data, nodeId, inputValue): HackResult
+discoverHiddenLinks(state, data): DiscoverResult
+moveToNode(state, data, targetNodeId): MoveResult
+
+// Database services (services.ts)
+createRun(projectId, userId, name?): Promise<CreateRunResult>
+attemptHackService(runId, nodeId, inputValue): Promise<HackResult>
+discoverLinksService(runId): Promise<DiscoverResult>
+moveToNodeService(runId, targetNodeId): Promise<MoveResult>
+```
+
 ## Reglas de Oro (NO negociables)
 
 1. **No inventar mecánicas nuevas** - Solo implementar lo explícitamente definido
