@@ -21,12 +21,16 @@ export default async function RunPage({ params }: Props) {
   const user = session.user
   const isAdmin = isSuperAdmin(user)
 
-  // Get run with definition
+  // Get run with definition and visual template
   const run = await prisma.run.findUnique({
     where: { id: runId },
     include: {
       definition: true,
-      project: true,
+      project: {
+        include: {
+          visualTemplate: true,
+        },
+      },
     },
   })
 
@@ -56,6 +60,21 @@ export default async function RunPage({ params }: Props) {
   const projectData = projectDataResult.data as ProjectData
   const runState = runStateResult.data as RunState
 
+  // Parse visual template
+  const visualTemplate = run.project.visualTemplate
+    ? {
+        layout: run.project.visualTemplate.layout as 'TECH' | 'IMMERSIVE',
+        theme: JSON.parse(run.project.visualTemplate.theme),
+        components: JSON.parse(run.project.visualTemplate.components),
+        effects: JSON.parse(run.project.visualTemplate.effects),
+      }
+    : {
+        layout: 'TECH' as const,
+        theme: {},
+        components: { showNodeMap: true, showSidePanel: true, showCentralTerminal: false },
+        effects: { scanlines: false, glitch: false, flicker: false },
+      }
+
   return (
     <GameScreen
       runId={runId}
@@ -64,6 +83,7 @@ export default async function RunPage({ params }: Props) {
       runName={run.name}
       initialState={runState}
       projectData={projectData}
+      visualTemplate={visualTemplate}
     />
   )
 }

@@ -3,6 +3,22 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import type { ProjectData, RunState, Warning, NodeDefinition, CircuitDefinition } from '@/lib/engine'
+import { ImmersiveView } from './immersive-view'
+
+interface VisualTemplate {
+  layout: 'TECH' | 'IMMERSIVE'
+  theme: Record<string, string>
+  components: {
+    showNodeMap: boolean
+    showSidePanel: boolean
+    showCentralTerminal: boolean
+  }
+  effects: {
+    scanlines: boolean
+    glitch: boolean
+    flicker: boolean
+  }
+}
 
 interface Props {
   runId: string
@@ -11,6 +27,7 @@ interface Props {
   runName: string | null
   initialState: RunState
   projectData: ProjectData
+  visualTemplate: VisualTemplate
 }
 
 export function GameScreen({
@@ -20,8 +37,27 @@ export function GameScreen({
   runName,
   initialState,
   projectData,
+  visualTemplate,
 }: Props) {
   const [state, setState] = useState<RunState>(initialState)
+
+  // Render IMMERSIVE view if layout is IMMERSIVE
+  if (visualTemplate.layout === 'IMMERSIVE') {
+    return (
+      <ImmersiveView
+        runId={runId}
+        projectId={projectId}
+        projectName={projectName}
+        runName={runName}
+        state={state}
+        projectData={projectData}
+        effects={visualTemplate.effects}
+        onStateChange={setState}
+      />
+    )
+  }
+
+  // Continue with TECH view below...
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)

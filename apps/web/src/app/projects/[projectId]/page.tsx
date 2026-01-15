@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { isSuperAdmin, getProjectRole } from '@/lib/rbac'
 import { prisma } from '@rolhack/database'
 import { CreateRunButton } from './create-run-button'
+import { EditProjectForm } from './edit-project-form'
 
 interface Props {
   params: Promise<{ projectId: string }>
@@ -105,7 +106,14 @@ export default async function ProjectDetailPage({ params }: Props) {
               )}
             </div>
             {canManage && (
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3">
+                <EditProjectForm
+                  projectId={projectId}
+                  initialName={project.name}
+                  initialDescription={project.description}
+                  initialEnabled={project.enabled}
+                  initialTemplateId={project.visualTemplateId}
+                />
                 <Link
                   href={`/projects/${projectId}/editor`}
                   className="px-3 py-1.5 bg-cyber-secondary/10 border border-cyber-secondary/30 hover:bg-cyber-secondary/20 text-cyber-secondary text-sm rounded transition-colors"

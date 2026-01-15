@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { isSuperAdmin } from '@/lib/rbac'
 import { prisma } from '@rolhack/database'
+import { AdminProjectActions } from './admin-project-actions'
 
 export default async function AdminPage() {
   const session = await auth()
@@ -104,12 +105,19 @@ export default async function AdminPage() {
                         {project._count.members} miembros &middot; {project._count.runs} runs
                       </p>
                     </div>
-                    <Link
-                      href={`/admin/projects/${project.id}`}
-                      className="px-4 py-2 bg-cyber-accent/10 border border-cyber-accent/30 hover:bg-cyber-accent/20 text-cyber-accent rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Gestionar
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <AdminProjectActions
+                        projectId={project.id}
+                        projectName={project.name}
+                        runCount={project._count.runs}
+                      />
+                      <Link
+                        href={`/admin/projects/${project.id}`}
+                        className="px-4 py-2 bg-cyber-accent/10 border border-cyber-accent/30 hover:bg-cyber-accent/20 text-cyber-accent rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Gestionar
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}

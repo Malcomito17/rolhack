@@ -2,6 +2,54 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Default visual templates
+const DEFAULT_TEMPLATES = [
+  {
+    name: 'default-tech',
+    description: 'Vista tecnica con mapa de nodos y panel lateral',
+    layout: 'TECH',
+    theme: JSON.stringify({
+      background: 'cyber-dark',
+      primaryColor: 'cyber-primary',
+      secondaryColor: 'cyber-secondary',
+      font: 'mono',
+    }),
+    components: JSON.stringify({
+      showNodeMap: true,
+      showSidePanel: true,
+      showCentralTerminal: false,
+    }),
+    effects: JSON.stringify({
+      scanlines: false,
+      glitch: false,
+      flicker: false,
+    }),
+    isSystem: true,
+  },
+  {
+    name: 'matrix-immersive',
+    description: 'Vista inmersiva tipo Matrix con terminal central',
+    layout: 'IMMERSIVE',
+    theme: JSON.stringify({
+      background: 'matrix-black',
+      primaryColor: 'matrix-green',
+      secondaryColor: 'matrix-green-dark',
+      font: 'mono',
+    }),
+    components: JSON.stringify({
+      showNodeMap: false,
+      showSidePanel: false,
+      showCentralTerminal: true,
+    }),
+    effects: JSON.stringify({
+      scanlines: true,
+      glitch: true,
+      flicker: true,
+    }),
+    isSystem: true,
+  },
+]
+
 // Demo project data
 const DEMO_PROJECT_DATA = {
   meta: {
@@ -92,6 +140,27 @@ const DEMO_PROJECT_DATA = {
 
 async function main() {
   console.log('🌱 Starting seed...')
+
+  // Create default visual templates
+  console.log('🎨 Creating visual templates...')
+  for (const template of DEFAULT_TEMPLATES) {
+    const existing = await prisma.visualTemplate.findUnique({
+      where: { name: template.name },
+    })
+
+    if (existing) {
+      console.log(`  Template "${template.name}" already exists, updating...`)
+      await prisma.visualTemplate.update({
+        where: { name: template.name },
+        data: template,
+      })
+    } else {
+      await prisma.visualTemplate.create({
+        data: template,
+      })
+      console.log(`  ✅ Created template: ${template.name}`)
+    }
+  }
 
   // Get SUPERADMIN emails from env
   const superadminEmails = process.env.SUPERADMIN_EMAILS?.split(',').map((e) =>

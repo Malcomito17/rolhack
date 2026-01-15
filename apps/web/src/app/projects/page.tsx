@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { isSuperAdmin } from '@/lib/rbac'
 import { prisma } from '@rolhack/database'
+import { CreateProjectButton } from './create-project-button'
 
 interface ProjectItem {
   id: string
@@ -92,14 +93,19 @@ export default async function ProjectsPage() {
               Proyectos
             </h1>
           </div>
-          {isAdmin && (
-            <Link
-              href="/admin"
-              className="text-cyber-accent hover:text-cyber-accent/80 text-sm"
-            >
-              Admin Panel
-            </Link>
-          )}
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <>
+                <CreateProjectButton />
+                <Link
+                  href="/admin"
+                  className="text-cyber-accent hover:text-cyber-accent/80 text-sm"
+                >
+                  Admin Panel
+                </Link>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Projects list */}
