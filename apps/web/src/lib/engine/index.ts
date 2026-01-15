@@ -8,6 +8,15 @@ export * from './types'
 // Schemas (Zod)
 export * from './schemas'
 
+// Validation (extended with business rules)
+export {
+  validateProjectDataFull,
+  validateProjectDataFromJson,
+  formatErrorPath,
+  type ValidationError as ProjectValidationError,
+  type ValidationResult as ProjectValidationResult,
+} from './validation'
+
 // Engine functions
 export {
   // Utilities
@@ -25,7 +34,8 @@ export {
   attemptHack,
   discoverHiddenLinks,
   moveToNode,
-  getAccessibleNodes,
+  getAvailableMoves,
+  getAccessibleNodes, // @deprecated - use getAvailableMoves
   getCurrentNodeInfo,
 } from './engine'
 

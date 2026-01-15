@@ -18,7 +18,7 @@ export const NodeDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   level: z.number().int().min(0),
-  cd: z.number().int().min(1),
+  cd: z.number().int().min(0), // 0 allowed for entry nodes
   failMode: FailModeSchema,
   visibleByDefault: z.boolean(),
 })
@@ -108,8 +108,10 @@ export const CreateRunInputSchema = z.object({
   name: z.string().optional(),
 })
 
+/**
+ * PROMPT 7: No longer accepts nodeId - hack always applies to current position
+ */
 export const AttemptHackInputSchema = z.object({
-  nodeId: z.string().min(1),
   inputValue: z.number().int().min(0),
 })
 

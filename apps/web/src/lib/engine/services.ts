@@ -179,9 +179,12 @@ export async function createRun(
 // ATTEMPT HACK SERVICE
 // =============================================================================
 
+/**
+ * Attempt to hack the current node
+ * PROMPT 7: No longer accepts nodeId - always hacks current position
+ */
 export async function attemptHackService(
   runId: string,
-  nodeId: string,
   inputValue: number
 ): Promise<AttemptHackResult> {
   const { runState, projectData } = await getRunWithDefinition(runId)
@@ -189,7 +192,6 @@ export async function attemptHackService(
   const { newState, result } = engineAttemptHack(
     runState,
     projectData,
-    nodeId,
     inputValue
   )
 

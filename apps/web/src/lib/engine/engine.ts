@@ -196,14 +196,29 @@ export function hasHiddenLinksAvailable(
 }
 
 /**
- * Attempt to hack a node
+ * Attempt to hack the current node
+ *
+ * RULES (PROMPT 7/8):
+ * - Hack always applies to current position node
+ * - Roll < 3 = BLOCKED always (critical failure)
+ * - Roll >= cd = HACKED (success)
+ * - 3 <= roll < cd = depends on failMode (WARNING allows retry, BLOQUEO blocks)
+ *
+ * DIEGETIC MESSAGES (PROMPT 8):
+ * - No CD, failMode, or threshold information revealed to user
+ * - Use system-style messages: ACCESS GRANTED, LOCKDOWN, etc.
  */
 export function attemptHack(
   state: RunState,
   data: ProjectData,
-  nodeId: string,
   inputValue: number
 ): { newState: RunState; result: AttemptHackResult } {
+  // Ensure numeric conversion
+  const roll = Number(inputValue)
+
+  // Always hack current position node
+  const nodeId = state.position.nodeId
+
   // Find the node
   const found = findNode(data, nodeId)
   if (!found) {
@@ -213,12 +228,13 @@ export function attemptHack(
         success: false,
         hackeado: false,
         bloqueado: false,
-        message: `Nodo ${nodeId} no encontrado`,
+        message: 'TARGET NODE NOT FOUND',
       },
     }
   }
 
   const { circuit, node } = found
+  const cd = Number(node.cd)
   const nodeState = state.nodes[nodeId]
 
   if (!nodeState) {
@@ -228,7 +244,20 @@ export function attemptHack(
         success: false,
         hackeado: false,
         bloqueado: false,
-        message: `Estado del nodo ${nodeId} no inicializado`,
+        message: 'NODE STATE ERROR',
+      },
+    }
+  }
+
+  // Check if node is already hacked
+  if (nodeState.hackeado) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        hackeado: true,
+        bloqueado: false,
+        message: 'NODE ALREADY COMPROMISED',
       },
     }
   }
@@ -241,7 +270,7 @@ export function attemptHack(
         success: false,
         hackeado: false,
         bloqueado: true,
-        message: `Nodo ${node.name} está bloqueado permanentemente`,
+        message: 'LOCKDOWN ACTIVE — ACCESS PERMANENTLY DENIED',
       },
     }
   }
@@ -253,7 +282,7 @@ export function attemptHack(
         success: false,
         hackeado: false,
         bloqueado: false,
-        message: `Nodo ${node.name} es inaccesible`,
+        message: 'NODE UNREACHABLE',
       },
     }
   }
@@ -265,9 +294,35 @@ export function attemptHack(
   // Increment attempts
   newNodeState.intentos++
 
-  // Check if hack succeeds
-  if (inputValue >= node.cd) {
-    // SUCCESS
+  const timestamp = new Date().toISOString()
+
+  // RULE 1: Roll < 3 = CRITICAL FAILURE - Always blocked
+  if (roll < 3) {
+    newNodeState.bloqueado = true
+    newNodeState.ultimoResultado = 'fallo'
+
+    const warning: Warning = {
+      severity: 'BLACK_ICE',
+      nodeId,
+      message: `BLACK ICE DEPLOYED — ${node.name} TERMINATED`,
+      timestamp,
+    }
+    newState.warnings.push(warning)
+
+    return {
+      newState,
+      result: {
+        success: false,
+        hackeado: false,
+        bloqueado: true,
+        warning,
+        message: 'CRITICAL FAILURE — BLACK ICE DEPLOYED — NODE LOCKED',
+      },
+    }
+  }
+
+  // RULE 2: Roll >= CD = SUCCESS
+  if (roll >= cd) {
     newNodeState.hackeado = true
     newNodeState.ultimoResultado = 'exito'
     newState.lastHackedNodeByCircuit[circuit.id] = nodeId
@@ -278,22 +333,20 @@ export function attemptHack(
         success: true,
         hackeado: true,
         bloqueado: false,
-        message: `¡Hackeo exitoso! ${node.name} comprometido.`,
+        message: 'ACCESS GRANTED — SECURITY HANDSHAKE ACCEPTED',
       },
     }
   }
 
-  // FAILURE
+  // RULE 3: 3 <= roll < CD = Depends on failMode
   newNodeState.ultimoResultado = 'fallo'
-
-  const timestamp = new Date().toISOString()
   let warning: Warning
 
   if (node.failMode === 'WARNING') {
     warning = {
-      severity: 'ALERT',
+      severity: 'TRACE',
       nodeId,
-      message: `Intento de intrusión detectado en ${node.name}. Sistema en alerta.`,
+      message: `TRACE DETECTED — ${node.name}`,
       timestamp,
     }
     newState.warnings.push(warning)
@@ -305,17 +358,17 @@ export function attemptHack(
         hackeado: false,
         bloqueado: false,
         warning,
-        message: `Hackeo fallido. Valor ${inputValue} insuficiente (CD: ${node.cd}). Puedes reintentar.`,
+        message: 'ACCESS DENIED — TRACE DETECTED — RETRY WINDOW OPEN',
       },
     }
   }
 
-  // BLOQUEO
+  // BLOQUEO mode
   newNodeState.bloqueado = true
   warning = {
     severity: 'LOCKDOWN',
     nodeId,
-    message: `BLOQUEO ACTIVADO: ${node.name} ha entrado en modo de seguridad. Acceso denegado permanentemente.`,
+    message: `LOCKDOWN ENGAGED — ${node.name}`,
     timestamp,
   }
   newState.warnings.push(warning)
@@ -327,13 +380,15 @@ export function attemptHack(
       hackeado: false,
       bloqueado: true,
       warning,
-      message: `Hackeo fallido. Nodo ${node.name} BLOQUEADO permanentemente.`,
+      message: 'ACCESS DENIED — LOCKDOWN ENGAGED — NODE LOCKED',
     },
   }
 }
 
 /**
  * Discover hidden links from current position
+ *
+ * NOTE (PROMPT 8): Does NOT require current node to be hacked
  */
 export function discoverHiddenLinks(
   state: RunState,
@@ -348,7 +403,7 @@ export function discoverHiddenLinks(
       result: {
         discoveredLinks: [],
         discoveredNodes: [],
-        message: 'Circuito no encontrado',
+        message: 'NETWORK ERROR — CIRCUIT NOT FOUND',
       },
     }
   }
@@ -385,7 +440,7 @@ export function discoverHiddenLinks(
       result: {
         discoveredLinks: [],
         discoveredNodes: [],
-        message: 'No hay accesos ocultos desde esta posición',
+        message: 'SCAN COMPLETE — NO HIDDEN PATHWAYS DETECTED',
       },
     }
   }
@@ -395,13 +450,18 @@ export function discoverHiddenLinks(
     result: {
       discoveredLinks,
       discoveredNodes,
-      message: `Descubiertos ${discoveredLinks.length} acceso(s) oculto(s)`,
+      message: `SCAN COMPLETE — ${discoveredLinks.length} HIDDEN PATHWAY(S) REVEALED`,
     },
   }
 }
 
 /**
- * Move to a connected node
+ * Move to a node
+ *
+ * RULES (PROMPT 7/8):
+ * - Rule A (Fast-travel): Can ALWAYS move to any already-hacked node in the circuit
+ * - Rule B (Advance): To move to a non-hacked node via link, current node must be hacked first
+ * - Level does NOT determine movement — only links and hack state matter
  */
 export function moveToNode(
   state: RunState,
@@ -417,7 +477,102 @@ export function moveToNode(
       result: {
         success: false,
         newPosition: state.position,
-        message: 'Circuito actual no encontrado',
+        message: 'NETWORK ERROR — CIRCUIT NOT FOUND',
+      },
+    }
+  }
+
+  // Can't move to same node
+  if (targetNodeId === currentNodeId) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'ALREADY AT TARGET NODE',
+      },
+    }
+  }
+
+  // Check target node exists and get its state
+  const targetNode = circuit.nodes.find((n) => n.id === targetNodeId)
+  if (!targetNode) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'TARGET NODE NOT FOUND',
+      },
+    }
+  }
+
+  const targetNodeState = state.nodes[targetNodeId]
+  if (!targetNodeState) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'NODE STATE ERROR',
+      },
+    }
+  }
+
+  // Check target is not inaccessible
+  if (targetNodeState.inaccesible) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'TARGET NODE UNREACHABLE',
+      },
+    }
+  }
+
+  // Check target is not blocked
+  if (targetNodeState.bloqueado) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'TARGET NODE IN LOCKDOWN — ACCESS DENIED',
+      },
+    }
+  }
+
+  // RULE A: Fast-travel to already-hacked nodes (always allowed)
+  if (targetNodeState.hackeado) {
+    const newState = structuredClone(state)
+    newState.position = {
+      circuitId,
+      nodeId: targetNodeId,
+    }
+
+    return {
+      newState,
+      result: {
+        success: true,
+        newPosition: newState.position,
+        message: `RECONNECTING TO ${targetNode.name.toUpperCase()}...`,
+      },
+    }
+  }
+
+  // RULE B: Move to non-hacked node requires:
+  // 1. Current node must be hacked
+  // 2. Must have a valid link connection
+
+  const currentNodeState = state.nodes[currentNodeId]
+  if (!currentNodeState?.hackeado) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'CURRENT NODE NOT COMPROMISED — CANNOT TRAVERSE',
       },
     }
   }
@@ -433,7 +588,7 @@ export function moveToNode(
       result: {
         success: false,
         newPosition: state.position,
-        message: `No existe conexión entre ${currentNodeId} y ${targetNodeId}`,
+        message: 'NO DIRECT PATHWAY TO TARGET',
       },
     }
   }
@@ -447,7 +602,7 @@ export function moveToNode(
       result: {
         success: false,
         newPosition: state.position,
-        message: 'El enlace no ha sido descubierto',
+        message: 'PATHWAY NOT YET MAPPED',
       },
     }
   }
@@ -459,32 +614,19 @@ export function moveToNode(
       result: {
         success: false,
         newPosition: state.position,
-        message: 'El enlace está bloqueado',
+        message: 'PATHWAY BLOCKED',
       },
     }
   }
 
-  // Check target node
-  const targetNodeState = state.nodes[targetNodeId]
-
-  if (!targetNodeState) {
+  // Check target is discovered
+  if (!targetNodeState.descubierto) {
     return {
       newState: state,
       result: {
         success: false,
         newPosition: state.position,
-        message: 'Nodo destino no encontrado en el estado',
-      },
-    }
-  }
-
-  if (targetNodeState.inaccesible) {
-    return {
-      newState: state,
-      result: {
-        success: false,
-        newPosition: state.position,
-        message: 'El nodo destino es inaccesible',
+        message: 'TARGET NODE NOT YET IDENTIFIED',
       },
     }
   }
@@ -496,52 +638,102 @@ export function moveToNode(
     nodeId: targetNodeId,
   }
 
-  // Get target node name for message
-  const targetNode = circuit.nodes.find((n) => n.id === targetNodeId)
-  const nodeName = targetNode?.name || targetNodeId
-
   return {
     newState,
     result: {
       success: true,
       newPosition: newState.position,
-      message: `Movido a ${nodeName}`,
+      message: `TRAVERSING TO ${targetNode.name.toUpperCase()}...`,
     },
   }
 }
 
 /**
- * Get accessible nodes from current position
- * Returns nodes that can be moved to (connected via discovered, non-blocked links)
+ * Get available moves from current position
+ *
+ * RULES (PROMPT 7):
+ * - All hacked nodes are available (fast-travel)
+ * - If current node is hacked, linked non-hacked nodes are also available
+ *
+ * Returns object with:
+ * - fastTravel: nodes that can be fast-traveled to (already hacked)
+ * - advance: nodes that can be advanced to (connected via link, current is hacked)
+ * - all: combined list of all available moves
+ */
+export function getAvailableMoves(
+  state: RunState,
+  data: ProjectData
+): { fastTravel: string[]; advance: string[]; all: string[] } {
+  const { circuitId, nodeId: currentNodeId } = state.position
+  const circuit = findCircuit(data, circuitId)
+
+  if (!circuit) return { fastTravel: [], advance: [], all: [] }
+
+  const fastTravel: string[] = []
+  const advance: string[] = []
+
+  const currentNodeState = state.nodes[currentNodeId]
+  const currentIsHacked = currentNodeState?.hackeado === true
+
+  // Collect all hacked nodes (fast-travel targets)
+  for (const node of circuit.nodes) {
+    if (node.id === currentNodeId) continue // Can't move to current
+
+    const nodeState = state.nodes[node.id]
+    if (!nodeState) continue
+    if (nodeState.inaccesible || nodeState.bloqueado) continue
+
+    if (nodeState.hackeado) {
+      fastTravel.push(node.id)
+    }
+  }
+
+  // If current node is hacked, collect linked non-hacked nodes (advance targets)
+  if (currentIsHacked) {
+    const linksFromNode = getLinksFromNode(circuit, currentNodeId)
+
+    for (const link of linksFromNode) {
+      const linkState = state.links[link.id]
+
+      // Link must be discovered and not blocked
+      if (!linkState || !linkState.descubierto || linkState.inaccesible) {
+        continue
+      }
+
+      const targetNodeId = getLinkTarget(link, currentNodeId)
+      const targetNodeState = state.nodes[targetNodeId]
+
+      // Target must be discovered, not blocked, not inaccessible, and not already hacked
+      if (
+        targetNodeState &&
+        targetNodeState.descubierto &&
+        !targetNodeState.inaccesible &&
+        !targetNodeState.bloqueado &&
+        !targetNodeState.hackeado
+      ) {
+        // Avoid duplicates
+        if (!advance.includes(targetNodeId)) {
+          advance.push(targetNodeId)
+        }
+      }
+    }
+  }
+
+  // Combine both lists (no duplicates since hacked nodes are in fastTravel, non-hacked in advance)
+  const all = [...fastTravel, ...advance]
+
+  return { fastTravel, advance, all }
+}
+
+/**
+ * Get accessible nodes from current position (legacy helper)
+ * @deprecated Use getAvailableMoves() instead for proper PROMPT 7 logic
  */
 export function getAccessibleNodes(
   state: RunState,
   data: ProjectData
 ): string[] {
-  const { circuitId, nodeId } = state.position
-  const circuit = findCircuit(data, circuitId)
-
-  if (!circuit) return []
-
-  const linksFromNode = getLinksFromNode(circuit, nodeId)
-  const accessible: string[] = []
-
-  for (const link of linksFromNode) {
-    const linkState = state.links[link.id]
-
-    if (!linkState || !linkState.descubierto || linkState.inaccesible) {
-      continue
-    }
-
-    const targetNodeId = getLinkTarget(link, nodeId)
-    const targetNodeState = state.nodes[targetNodeId]
-
-    if (targetNodeState && !targetNodeState.inaccesible) {
-      accessible.push(targetNodeId)
-    }
-  }
-
-  return accessible
+  return getAvailableMoves(state, data).all
 }
 
 /**

@@ -103,7 +103,36 @@ SEED_DEMO=true
 
 # Deploy con logs
 ./scripts/deploy-to-pi.sh --logs
+
+# Deploy actualizando variables de entorno
+./scripts/deploy-to-pi.sh --env
+
+# Combinaciones
+./scripts/deploy-to-pi.sh --build --logs
+./scripts/deploy-to-pi.sh --build --env    # Rebuild + actualizar credenciales
 ```
+
+### Manejo de Credenciales
+
+**IMPORTANTE**: El script de deploy **NO sobrescribe** `.env.production` por defecto para proteger las credenciales OAuth configuradas en el servidor.
+
+**Flujo de credenciales:**
+
+1. **Primera vez**: Si no existe `.env.production` en el servidor, se copia automaticamente
+2. **Deploys normales**: Se preserva el archivo existente en el servidor
+3. **Actualizar credenciales**: Usar `--env` para forzar la actualizacion
+
+```bash
+# Si necesitas actualizar credenciales OAuth o variables de entorno:
+./scripts/deploy-to-pi.sh --env --build
+
+# Ver credenciales actuales en el servidor:
+ssh malcomito@100.119.40.15 "cat /mnt/ssd/projects/rolhack/.env.production"
+```
+
+**Archivos de credenciales:**
+- **Local**: `.env.production` (backup de referencia)
+- **Servidor**: `/mnt/ssd/projects/rolhack/.env.production` (activo)
 
 ### Logs
 

@@ -7,8 +7,12 @@
 #   ./scripts/deploy-to-pi.sh --build      # Force rebuild de imagen Docker
 #   ./scripts/deploy-to-pi.sh --seed       # Deploy + ejecutar seed
 #   ./scripts/deploy-to-pi.sh --logs       # Ver logs después del deploy
+#   ./scripts/deploy-to-pi.sh --env        # Forzar actualización de .env.production
 #
-# IMPORTANTE: RolHack corre en Docker, no PM2.
+# IMPORTANTE:
+#   - RolHack corre en Docker, no PM2.
+#   - .env.production NO se sobrescribe por defecto (protege credenciales)
+#   - Usa --env para forzar actualización de variables de entorno
 # =============================================================================
 
 set -e  # Exit on error
@@ -24,6 +28,7 @@ PROD_URL="https://rolhack.euforiateclog.cloud"
 FORCE_BUILD=false
 DO_SEED=false
 SHOW_LOGS=false
+UPDATE_ENV=false
 
 # Parsear argumentos
 for arg in "$@"; do
@@ -37,6 +42,9 @@ for arg in "$@"; do
     --logs)
       SHOW_LOGS=true
       ;;
+    --env)
+      UPDATE_ENV=true
+      ;;
     --help|-h)
       echo "USO: ./scripts/deploy-to-pi.sh [opciones]"
       echo ""
@@ -44,7 +52,11 @@ for arg in "$@"; do
       echo "  --build     Force rebuild de imagen Docker"
       echo "  --seed      Ejecutar seed después del deploy"
       echo "  --logs      Ver logs después del deploy"
+      echo "  --env       Forzar actualización de .env.production (sobrescribe credenciales)"
       echo "  --help      Mostrar esta ayuda"
+      echo ""
+      echo "NOTA: .env.production NO se sobrescribe por defecto para proteger credenciales."
+      echo "      Si necesitas actualizar variables de entorno, usa --env"
       exit 0
       ;;
   esac
@@ -72,6 +84,9 @@ fi
 if [ "$DO_SEED" = true ]; then
   echo -e "Seed:      ${YELLOW}SI${NC}"
 fi
+if [ "$UPDATE_ENV" = true ]; then
+  echo -e "Env:       ${YELLOW}ACTUALIZAR${NC}"
+fi
 echo ""
 
 # Verificar que existe .env.production localmente
@@ -82,11 +97,25 @@ if [ ! -f "$LOCAL_PATH/.env.production" ]; then
 fi
 
 # Paso 1: Crear directorio remoto si no existe
-echo -e "${YELLOW}[1/5]${NC} Preparando directorio remoto..."
+echo -e "${YELLOW}[1/6]${NC} Preparando directorio remoto..."
 ssh $PI_HOST "mkdir -p $PI_PATH"
 
-# Paso 2: Sincronizar archivos (excluyendo node_modules, .next, .git, .env.local)
-echo -e "${YELLOW}[2/5]${NC} Sincronizando archivos..."
+# Paso 2: Verificar si existe .env.production en el servidor
+echo -e "${YELLOW}[2/6]${NC} Verificando configuración de entorno..."
+ENV_EXISTS=$(ssh $PI_HOST "[ -f $PI_PATH/.env.production ] && echo 'yes' || echo 'no'")
+
+if [ "$ENV_EXISTS" = "no" ]; then
+  echo -e "${BLUE}  .env.production no existe en servidor, copiando...${NC}"
+  scp "$LOCAL_PATH/.env.production" "$PI_HOST:$PI_PATH/.env.production"
+elif [ "$UPDATE_ENV" = true ]; then
+  echo -e "${YELLOW}  Actualizando .env.production (--env flag)...${NC}"
+  scp "$LOCAL_PATH/.env.production" "$PI_HOST:$PI_PATH/.env.production"
+else
+  echo -e "${GREEN}  .env.production ya existe, preservando credenciales${NC}"
+fi
+
+# Paso 3: Sincronizar archivos (excluyendo node_modules, .next, .git, .env files)
+echo -e "${YELLOW}[3/6]${NC} Sincronizando archivos..."
 rsync -avz --delete \
   --exclude 'node_modules' \
   --exclude '.next' \
@@ -95,25 +124,26 @@ rsync -avz --delete \
   --exclude '*.db' \
   --exclude '*.db-journal' \
   --exclude '.env.local' \
+  --exclude '.env.production' \
   --exclude 'apps/web/.env.local' \
   --exclude 'packages/database/.env' \
   $LOCAL_PATH/ \
   $PI_HOST:$PI_PATH/
 
-# Paso 3: Build Docker image en Pi
-echo -e "${YELLOW}[3/5]${NC} Building Docker image en Pi..."
+# Paso 4: Build Docker image en Pi
+echo -e "${YELLOW}[4/6]${NC} Building Docker image en Pi..."
 if [ "$FORCE_BUILD" = true ]; then
   ssh $PI_HOST "cd $PI_PATH && docker compose build --no-cache"
 else
   ssh $PI_HOST "cd $PI_PATH && docker compose build"
 fi
 
-# Paso 4: Deploy con Docker Compose
-echo -e "${YELLOW}[4/5]${NC} Iniciando container..."
+# Paso 5: Deploy con Docker Compose
+echo -e "${YELLOW}[5/6]${NC} Iniciando container..."
 ssh $PI_HOST "cd $PI_PATH && docker compose down 2>/dev/null || true && docker compose up -d"
 
-# Paso 5: Ejecutar seed si se solicita
-echo -e "${YELLOW}[5/5]${NC} Verificando base de datos..."
+# Paso 6: Ejecutar seed si se solicita
+echo -e "${YELLOW}[6/6]${NC} Verificando base de datos..."
 # Migraciones se ejecutan automaticamente en el entrypoint del container
 if [ "$DO_SEED" = true ]; then
   echo -e "${BLUE}  Ejecutando seed...${NC}"

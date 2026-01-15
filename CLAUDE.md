@@ -234,6 +234,9 @@ discoverLinksService(runId): Promise<DiscoverResult>
 moveToNodeService(runId, targetNodeId): Promise<MoveResult>
 ```
 
+
+---
+
 ## Reglas de Oro (NO negociables)
 
 1. **No inventar mecánicas nuevas** - Solo implementar lo explícitamente definido

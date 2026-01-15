@@ -47,10 +47,9 @@ export async function POST(
       )
     }
 
-    // Attempt hack
+    // Attempt hack (PROMPT 7: always hacks current position)
     const result = await attemptHackService(
       runId,
-      parsed.data.nodeId,
       parsed.data.inputValue
     )
 

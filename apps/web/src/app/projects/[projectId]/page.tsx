@@ -105,12 +105,20 @@ export default async function ProjectDetailPage({ params }: Props) {
               )}
             </div>
             {canManage && (
-              <Link
-                href={`/admin/projects/${projectId}`}
-                className="text-cyber-accent hover:text-cyber-accent/80 text-sm whitespace-nowrap"
-              >
-                Gestionar
-              </Link>
+              <div className="flex gap-3">
+                <Link
+                  href={`/projects/${projectId}/editor`}
+                  className="px-3 py-1.5 bg-cyber-secondary/10 border border-cyber-secondary/30 hover:bg-cyber-secondary/20 text-cyber-secondary text-sm rounded transition-colors"
+                >
+                  Editor
+                </Link>
+                <Link
+                  href={`/admin/projects/${projectId}`}
+                  className="text-cyber-accent hover:text-cyber-accent/80 text-sm whitespace-nowrap py-1.5"
+                >
+                  Gestionar
+                </Link>
+              </div>
             )}
           </div>
         </div>
