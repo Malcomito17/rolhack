@@ -1,0 +1,223 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS (como strings en SQLite)
+// ============================================
+
+// GlobalRole: SUPERADMIN | USER
+// ProjectRole: OWNER | USER
+// RunStatus: ACTIVE | ARCHIVED
+
+// ============================================
+// NEXTAUTH MODELS
+// ============================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// CORE: USER
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+
+  // RBAC: Global role
+  roleGlobal String @default("USER") // SUPERADMIN | USER
+
+  // Status
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // RolHack relations
+  projectMemberships ProjectMember[]
+  projectDefinitions ProjectDefinition[] @relation("DefinitionCreator")
+  runs               Run[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// ============================================
+// CORE: PROJECT
+// ============================================
+
+model Project {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // Theme configuration (optional)
+  themeId        String?
+  themeOverrides String? // JSON string for theme overrides
+
+  // Status
+  enabled   Boolean   @default(true)
+  deletedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  members     ProjectMember[]
+  definitions ProjectDefinition[]
+  runs        Run[]
+
+  @@map("projects")
+}
+
+// ============================================
+// CORE: PROJECT MEMBER (RBAC per project)
+// ============================================
+
+model ProjectMember {
+  id        String @id @default(cuid())
+  projectId String
+  userId    String
+
+  // Role in this project: OWNER | USER
+  role String @default("USER")
+
+  // Status
+  active Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+// ============================================
+// CORE: PROJECT DEFINITION (versioned world data)
+// ============================================
+
+model ProjectDefinition {
+  id        String @id @default(cuid())
+  projectId String
+
+  // Version control
+  version  Int     @default(1)
+  isActive Boolean @default(false) // Only one active per project
+
+  // World definition as JSON (circuits, nodes, links)
+  data String // JSON string containing the world definition
+
+  // Creator
+  createdByUserId String
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("DefinitionCreator", fields: [createdByUserId], references: [id])
+  runs      Run[]
+
+  @@unique([projectId, version])
+  @@index([projectId])
+  @@index([projectId, isActive])
+  @@map("project_definitions")
+}
+
+// ============================================
+// CORE: RUN (user execution instance)
+// ============================================
+
+model Run {
+  id           String @id @default(cuid())
+  projectId    String
+  definitionId String
+  ownerUserId  String
+
+  // Run metadata
+  name String?
+
+  // Status: ACTIVE | ARCHIVED
+  status String @default("ACTIVE")
+
+  // Execution state as JSON (position, discovered nodes/links, etc.)
+  state String @default("{}") // JSON string
+
+  // Soft delete
+  deletedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  definition ProjectDefinition @relation(fields: [definitionId], references: [id])
+  owner      User              @relation(fields: [ownerUserId], references: [id])
+
+  @@index([projectId])
+  @@index([ownerUserId])
+  @@index([definitionId])
+  @@map("runs")
+}

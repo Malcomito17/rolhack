@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cyber-primary: #00ff9f;
+  --cyber-secondary: #00b8ff;
+  --cyber-accent: #ff00ff;
+  --cyber-dark: #0a0a0f;
+  --cyber-darker: #050508;
+}
+
+body {
+  min-height: 100vh;
+}
