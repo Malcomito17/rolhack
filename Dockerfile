@@ -27,10 +27,8 @@ RUN apk add --no-cache libc6-compat openssl
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependencies from deps stage (npm workspaces hoists to root)
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules 2>/dev/null || true
-COPY --from=deps /app/packages/database/node_modules ./packages/database/node_modules 2>/dev/null || true
 
 # Copy source code
 COPY . .
