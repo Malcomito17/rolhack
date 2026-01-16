@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import Link from 'next/link'
+import Image from 'next/image'
 import { LoginButton, LogoutButton } from '@/components/auth-buttons'
 import { isSuperAdmin } from '@/lib/rbac'
 
@@ -13,9 +14,14 @@ export default async function HomePage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-cyber-primary mb-4 tracking-wider">
-            ROLHACK
-          </h1>
+          <Image
+            src="/rolhack_logo.png"
+            alt="RolHack"
+            width={320}
+            height={115}
+            className="mx-auto mb-4"
+            priority
+          />
           <p className="text-gray-400">
             Framework de simulacion de hacking
           </p>
@@ -70,6 +76,24 @@ export default async function HomePage() {
               Inicia sesion para continuar
             </p>
             <LoginButton />
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-800" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-cyber-darker text-gray-600">o</span>
+              </div>
+            </div>
+
+            {/* Demo button */}
+            <Link
+              href="/demo"
+              className="block w-full bg-transparent border border-cyber-secondary/30 hover:border-cyber-secondary/50 hover:bg-cyber-secondary/10 text-cyber-secondary text-center py-3 px-4 rounded-lg transition-colors"
+            >
+              Probar Demo
+            </Link>
           </div>
         )}
       </div>
