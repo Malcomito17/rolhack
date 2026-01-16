@@ -113,6 +113,37 @@ SUPERADMIN_EMAILS="your@email.com"
 - Server components by default, 'use client' only when needed
 - Zod for request validation
 
+## Demo Mode
+
+Public demo accessible at `/demo` without authentication. Teaches game mechanics via guided tutorial.
+
+### Features
+- **No login required**: Visitors can try the game immediately
+- **Tutorial guiado**: Step-by-step instructions (11 steps)
+- **Ephemeral state**: Saved to sessionStorage, cleared on browser close
+- **CTA to register**: Prompts to create account after completion
+
+### Architecture
+The demo runs 100% client-side using pure engine functions:
+```
+/demo                           # Public route (no auth)
+  ├── page.tsx                  # Main demo page
+  ├── demo-immersive-view.tsx   # Terminal UI (no API calls)
+  ├── tutorial-overlay.tsx      # Step-by-step guide
+  ├── demo-banner.tsx           # "DEMO MODE" banner
+  └── completion-modal.tsx      # Post-tutorial CTA
+
+/lib/demo/
+  ├── tutorial-project.ts       # Hardcoded ProjectData (CD: 11-20)
+  ├── tutorial-steps.ts         # Tutorial step definitions
+  └── state-manager.ts          # sessionStorage helpers
+```
+
+### Tutorial Project
+- 1 circuit, 5 nodes
+- CD range: 11-20 (per game design)
+- Teaches: hack, scan (discover), movement, fast-travel
+
 ## Production Deployment
 
 Target: Raspberry Pi via Docker + Cloudflare Tunnel
@@ -233,9 +264,6 @@ attemptHackService(runId, nodeId, inputValue): Promise<HackResult>
 discoverLinksService(runId): Promise<DiscoverResult>
 moveToNodeService(runId, targetNodeId): Promise<MoveResult>
 ```
-
-
----
 
 ## Reglas de Oro (NO negociables)
 
