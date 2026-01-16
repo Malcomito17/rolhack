@@ -98,6 +98,7 @@ export const TimelineEventTypeSchema = z.enum([
   'CIRCUIT_SELECTED',
   'NODE_HACKED',
   'NODE_BLOCKED',
+  'CIRCUIT_BLOCKED',
   'LINKS_DISCOVERED',
   'CIRCUIT_CHANGED',
   'CIRCUIT_COMPLETED',
@@ -136,6 +137,8 @@ export const RunStateSchema = z.object({
   warnings: z.array(WarningSchema),
   // Timeline for visual replay - optional for backward compatibility with existing runs
   timeline: z.array(TimelineEventSchema).optional().default([]),
+  // Blocked circuits - when a BLOQUEO occurs, entire circuit is locked
+  blockedCircuits: z.record(z.string(), z.boolean()).optional().default({}),
 })
 
 // =============================================================================

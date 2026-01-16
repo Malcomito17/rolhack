@@ -133,6 +133,7 @@ export type TimelineEventType =
   | 'CIRCUIT_SELECTED'
   | 'NODE_HACKED'
   | 'NODE_BLOCKED'
+  | 'CIRCUIT_BLOCKED'
   | 'LINKS_DISCOVERED'
   | 'CIRCUIT_CHANGED'
   | 'CIRCUIT_COMPLETED'
@@ -183,6 +184,8 @@ export interface RunState {
   warnings: Warning[]
   // Timeline for visual replay (UI-only feature, doesn't affect logic)
   timeline: TimelineEvent[]
+  // Blocked circuits - when a BLOQUEO occurs, entire circuit is locked
+  blockedCircuits: Record<string, boolean>
 }
 
 // =============================================================================
@@ -276,6 +279,8 @@ export interface AttemptHackResult {
   success: boolean
   hackeado: boolean
   bloqueado: boolean
+  circuitBlocked?: boolean // True if entire circuit is now blocked
+  gameOver?: boolean // True if this is a critical game-ending failure (CD=1-2 + block)
   warning?: Warning
   message: string
 }

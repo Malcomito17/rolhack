@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import type { ProjectData, RunState } from '@/lib/engine'
 import type { AttemptHackResult, DiscoverLinksResult, MoveToNodeResult } from '@/lib/engine/types'
+import { CircuitMap } from '../runs/[runId]/circuit-map'
 
 interface Props {
   projectName: string
@@ -41,11 +42,16 @@ export function DemoImmersiveView({
   const [hackInput, setHackInput] = useState('')
   const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info'; text: string }[]>([])
   const terminalRef = useRef<HTMLDivElement>(null)
+  const [showGameOver, setShowGameOver] = useState(false)
+  const [gameOverMessage, setGameOverMessage] = useState('')
 
   // Get current circuit and node
   const currentCircuit = projectData.circuits.find(c => c.id === state.position.circuitId)
   const currentNode = currentCircuit?.nodes.find(n => n.id === state.position.nodeId)
   const currentNodeState = state.nodes[state.position.nodeId]
+
+  // Check if current circuit is blocked
+  const currentCircuitBlocked = state.blockedCircuits?.[state.position.circuitId] === true
 
   // Check if hidden links available
   const hasHiddenLinks = useCallback(() => {
@@ -158,6 +164,20 @@ export function DemoImmersiveView({
         addLine('success', `> ${result.message}`)
       } else {
         addLine('error', `> ${result.message}`)
+
+        // Check for circuit blocked
+        if (result.circuitBlocked) {
+          addLine('error', '> ═══════════════════════════════════════')
+          addLine('error', '> CIRCUIT LOCKDOWN INITIATED')
+          addLine('error', '> ALL ACCESS TO THIS NETWORK REVOKED')
+          addLine('error', '> ═══════════════════════════════════════')
+        }
+
+        // Check for game over (critical failure on CD 1-2)
+        if (result.gameOver) {
+          setGameOverMessage(result.message)
+          setShowGameOver(true)
+        }
       }
 
       if (result.warning) {
@@ -258,13 +278,15 @@ export function DemoImmersiveView({
         </div>
       </header>
 
-      {/* Main terminal */}
-      <main className="relative z-10 flex flex-col flex-1 min-h-0">
-        {/* Terminal output */}
-        <div
-          ref={terminalRef}
-          className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-0.5 sm:space-y-1"
-        >
+      {/* Main content area with sidebar */}
+      <div className="relative z-10 flex flex-1 min-h-0">
+        {/* Main terminal */}
+        <main className="flex flex-col flex-1 min-h-0">
+          {/* Terminal output */}
+          <div
+            ref={terminalRef}
+            className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-0.5 sm:space-y-1"
+          >
           {terminalLines.map((line, i) => (
             <p
               key={i}
@@ -340,81 +362,103 @@ export function DemoImmersiveView({
           <div className="max-w-4xl mx-auto">
             {/* Action buttons */}
             <div className="flex flex-wrap gap-1 sm:gap-2 mb-2 sm:mb-3">
-              {/* Hack input - only show if not hacked and not blocked */}
-              {currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
-                <div className="flex gap-1">
-                  <input
-                    type="number"
-                    value={hackInput}
-                    onChange={(e) => setHackInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="CODE"
-                    className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1 text-center text-xs sm:text-sm focus:outline-none"
-                    style={{
-                      border: `1px solid ${primaryColor}88`,
-                      color: primaryColor,
-                    }}
-                    disabled={loading}
-                  />
-                  <button
-                    onClick={doHack}
-                    disabled={loading || !hackInput}
-                    className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    style={{
-                      border: `1px solid ${primaryColor}88`,
-                      color: primaryColor,
-                    }}
+              {/* Circuit Blocked Message */}
+              {currentCircuitBlocked ? (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded text-xs sm:text-sm animate-pulse"
+                    style={{ backgroundColor: '#ff555522', border: '1px solid #ff5555', color: '#ff5555' }}
                   >
-                    BREACH
-                  </button>
+                    <span>⚠</span>
+                    <span>CIRCUIT LOCKDOWN — DEMO ENDED</span>
+                  </div>
+                  <Link
+                    href="/"
+                    className="px-3 py-2 rounded text-xs sm:text-sm font-bold transition-colors"
+                    style={{ backgroundColor: `${secondaryColor}22`, border: `1px solid ${secondaryColor}`, color: secondaryColor }}
+                  >
+                    EXIT DEMO
+                  </Link>
                 </div>
+              ) : (
+                <>
+                  {/* Hack input - only show if not hacked and not blocked */}
+                  {currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        value={hackInput}
+                        onChange={(e) => setHackInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="CODE"
+                        className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1 text-center text-xs sm:text-sm focus:outline-none"
+                        style={{
+                          border: `1px solid ${primaryColor}88`,
+                          color: primaryColor,
+                        }}
+                        disabled={loading}
+                      />
+                      <button
+                        onClick={doHack}
+                        disabled={loading || !hackInput}
+                        className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        style={{
+                          border: `1px solid ${primaryColor}88`,
+                          color: primaryColor,
+                        }}
+                      >
+                        BREACH
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Scan button */}
+                  {hasHiddenLinks() && (
+                    <button
+                      onClick={doDiscover}
+                      disabled={loading}
+                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                      style={{
+                        border: `1px solid ${secondaryColor}`,
+                        color: secondaryColor,
+                      }}
+                    >
+                      SCAN
+                    </button>
+                  )}
+
+                  {/* Move buttons */}
+                  {availableMoves.fastTravel.map(node => (
+                    <button
+                      key={node.id}
+                      onClick={() => doMove(node.id, node.name)}
+                      disabled={loading}
+                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                      style={{
+                        border: `1px solid ${primaryColor}aa`,
+                        color: primaryColor,
+                      }}
+                    >
+                      <span className="hidden sm:inline">JUMP: </span>{node.name}
+                    </button>
+                  ))}
+
+                  {availableMoves.advance.map(node => (
+                    <button
+                      key={node.id}
+                      onClick={() => doMove(node.id, node.name)}
+                      disabled={loading}
+                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                      style={{
+                        border: '1px solid #ffff5588',
+                        color: '#ffff55',
+                      }}
+                    >
+                      &gt; {node.name}
+                    </button>
+                  ))}
+                </>
               )}
-
-              {/* Scan button */}
-              {hasHiddenLinks() && (
-                <button
-                  onClick={doDiscover}
-                  disabled={loading}
-                  className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                  style={{
-                    border: `1px solid ${secondaryColor}`,
-                    color: secondaryColor,
-                  }}
-                >
-                  SCAN
-                </button>
-              )}
-
-              {/* Move buttons */}
-              {availableMoves.fastTravel.map(node => (
-                <button
-                  key={node.id}
-                  onClick={() => doMove(node.id, node.name)}
-                  disabled={loading}
-                  className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                  style={{
-                    border: `1px solid ${primaryColor}aa`,
-                    color: primaryColor,
-                  }}
-                >
-                  <span className="hidden sm:inline">JUMP: </span>{node.name}
-                </button>
-              ))}
-
-              {availableMoves.advance.map(node => (
-                <button
-                  key={node.id}
-                  onClick={() => doMove(node.id, node.name)}
-                  disabled={loading}
-                  className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                  style={{
-                    border: '1px solid #ffff5588',
-                    color: '#ffff55',
-                  }}
-                >
-                  &gt; {node.name}
-                </button>
-              ))}
             </div>
 
             {/* Command prompt */}
@@ -428,7 +472,87 @@ export function DemoImmersiveView({
             </div>
           </div>
         </div>
-      </main>
+        </main>
+
+        {/* Circuit Map Sidebar - hidden on mobile */}
+        {currentCircuit && (
+          <div className="hidden md:block flex-shrink-0">
+            <CircuitMap
+              circuit={currentCircuit}
+              state={state}
+              theme={{ primaryColor, secondaryColor, textColor, bgColor }}
+              mapStyle="graph"
+              currentNodeId={state.position.nodeId}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Game Over Modal */}
+      {showGameOver && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95">
+          {/* Glitch/explosion effect background */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 bg-red-900/20 animate-pulse" />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `
+                  radial-gradient(circle at 50% 50%, #ff000033 0%, transparent 50%),
+                  repeating-linear-gradient(0deg, #ff000008 0px, #ff000008 2px, transparent 2px, transparent 4px)
+                `,
+              }}
+            />
+          </div>
+
+          {/* Game Over content */}
+          <div className="relative z-10 text-center p-8 max-w-lg">
+            {/* Skull/explosion icon */}
+            <div className="text-8xl mb-6 animate-pulse">💀</div>
+
+            {/* Main message */}
+            <h1
+              className="text-4xl sm:text-5xl font-bold mb-4 tracking-wider animate-pulse"
+              style={{ color: '#ff0000', textShadow: '0 0 20px #ff0000, 0 0 40px #ff000088' }}
+            >
+              GAME OVER
+            </h1>
+
+            {/* Sub message */}
+            <div
+              className="text-lg sm:text-xl mb-6 font-mono"
+              style={{ color: '#ff5555' }}
+            >
+              <p className="mb-2">NEURAL LINK DESTROYED</p>
+              <p className="text-sm opacity-75">{gameOverMessage}</p>
+            </div>
+
+            {/* Terminal-style details */}
+            <div
+              className="text-left font-mono text-xs sm:text-sm p-4 rounded mb-6 mx-auto max-w-md"
+              style={{ backgroundColor: '#1a0000', border: '1px solid #ff000044', color: '#ff5555' }}
+            >
+              <p className="mb-1">&gt; DEMO TERMINATED</p>
+              <p className="mb-1">&gt; BLACK ICE COUNTERMEASURE ACTIVATED</p>
+              <p>&gt; OPERATOR CONNECTION SEVERED</p>
+            </div>
+
+            {/* Action button */}
+            <Link
+              href="/"
+              className="inline-block px-6 py-3 rounded text-lg font-bold transition-all hover:scale-105"
+              style={{
+                backgroundColor: '#ff000022',
+                border: '2px solid #ff0000',
+                color: '#ff0000',
+                textShadow: '0 0 10px #ff0000',
+              }}
+            >
+              DISCONNECT
+            </Link>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .bg-scanlines {

@@ -244,6 +244,7 @@ export function initializeRunState(data: ProjectData): RunState {
     links,
     warnings: [],
     timeline: [],
+    blockedCircuits: {},
   }
 
   // Add RUN_START event to timeline
@@ -354,6 +355,21 @@ export function attemptHack(
     }
   }
 
+  // Check if circuit is blocked
+  const circuitBlocked = state.blockedCircuits?.[circuit.id] === true
+  if (circuitBlocked) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        hackeado: false,
+        bloqueado: true,
+        circuitBlocked: true,
+        message: 'CIRCUIT IN LOCKDOWN — ALL ACCESS REVOKED',
+      },
+    }
+  }
+
   // Check if node is blocked or inaccessible
   if (nodeState.bloqueado) {
     return {
@@ -388,15 +404,23 @@ export function attemptHack(
 
   const timestamp = new Date().toISOString()
 
-  // RULE 1: Roll < 3 = CRITICAL FAILURE - Always blocked
+  // RULE 1: Roll < 3 = CRITICAL FAILURE - Always blocked (CIRCUIT LOCKDOWN)
   if (roll < 3) {
     newNodeState.bloqueado = true
     newNodeState.ultimoResultado = 'fallo'
 
+    // Block entire circuit
+    newState.blockedCircuits = { ...newState.blockedCircuits, [circuit.id]: true }
+
+    // Check for GAME OVER condition: CD = 1 or 2 means critical system
+    const isCriticalGameOver = cd <= 2
+
     const warning: Warning = {
       severity: 'BLACK_ICE',
       nodeId,
-      message: `BLACK ICE DEPLOYED — ${node.name} TERMINATED`,
+      message: isCriticalGameOver
+        ? `FATAL BREACH — NEURAL LINK SEVERED — ${circuit.name}`
+        : `BLACK ICE DEPLOYED — CIRCUIT ${circuit.name} TERMINATED`,
       timestamp,
     }
     newState.warnings.push(warning)
@@ -406,10 +430,23 @@ export function attemptHack(
       'NODE_BLOCKED',
       newState,
       circuit.id,
-      `Nodo ${node.name} bloqueado por BLACK ICE`,
+      isCriticalGameOver
+        ? `GAME OVER — ${node.name} — CONEXIÓN NEURAL DESTRUIDA`
+        : `Nodo ${node.name} bloqueado por BLACK ICE`,
       { nodeId, details: { warningGenerated: true } }
     )
     newState.timeline = [...newState.timeline, blockEvent]
+
+    // Record CIRCUIT_BLOCKED timeline event
+    const circuitBlockEvent = createTimelineEvent(
+      'CIRCUIT_BLOCKED',
+      newState,
+      circuit.id,
+      isCriticalGameOver
+        ? `GAME OVER — Circuito ${circuit.name} — DESTRUCCIÓN TOTAL`
+        : `Circuito ${circuit.name} bloqueado — BLACK ICE`
+    )
+    newState.timeline = [...newState.timeline, circuitBlockEvent]
 
     return {
       newState,
@@ -417,8 +454,12 @@ export function attemptHack(
         success: false,
         hackeado: false,
         bloqueado: true,
+        circuitBlocked: true,
+        gameOver: isCriticalGameOver,
         warning,
-        message: 'CRITICAL FAILURE — BLACK ICE DEPLOYED — NODE LOCKED',
+        message: isCriticalGameOver
+          ? 'FATAL ERROR — NEURAL LINK DESTROYED — GAME OVER'
+          : 'CRITICAL FAILURE — BLACK ICE — CIRCUIT LOCKDOWN ENGAGED',
       },
     }
   }
@@ -497,12 +538,21 @@ export function attemptHack(
     }
   }
 
-  // BLOQUEO mode
+  // BLOQUEO mode - Block entire circuit
   newNodeState.bloqueado = true
+
+  // Block entire circuit
+  newState.blockedCircuits = { ...newState.blockedCircuits, [circuit.id]: true }
+
+  // Check for GAME OVER condition: CD = 1 or 2 means critical system
+  const isCriticalGameOver = cd <= 2
+
   warning = {
-    severity: 'LOCKDOWN',
+    severity: isCriticalGameOver ? 'BLACK_ICE' : 'LOCKDOWN',
     nodeId,
-    message: `LOCKDOWN ENGAGED — ${node.name}`,
+    message: isCriticalGameOver
+      ? `FATAL BREACH — NEURAL LINK SEVERED — ${circuit.name}`
+      : `LOCKDOWN ENGAGED — CIRCUIT ${circuit.name}`,
     timestamp,
   }
   newState.warnings.push(warning)
@@ -512,10 +562,23 @@ export function attemptHack(
     'NODE_BLOCKED',
     newState,
     circuit.id,
-    `Nodo ${node.name} bloqueado por LOCKDOWN`,
+    isCriticalGameOver
+      ? `GAME OVER — ${node.name} — CONEXIÓN NEURAL DESTRUIDA`
+      : `Nodo ${node.name} bloqueado por LOCKDOWN`,
     { nodeId, details: { warningGenerated: true } }
   )
   newState.timeline = [...newState.timeline, blockEvent]
+
+  // Record CIRCUIT_BLOCKED timeline event
+  const circuitBlockEvent = createTimelineEvent(
+    'CIRCUIT_BLOCKED',
+    newState,
+    circuit.id,
+    isCriticalGameOver
+      ? `GAME OVER — Circuito ${circuit.name} — DESTRUCCIÓN TOTAL`
+      : `Circuito ${circuit.name} bloqueado — LOCKDOWN`
+  )
+  newState.timeline = [...newState.timeline, circuitBlockEvent]
 
   return {
     newState,
@@ -523,8 +586,12 @@ export function attemptHack(
       success: false,
       hackeado: false,
       bloqueado: true,
+      circuitBlocked: true,
+      gameOver: isCriticalGameOver,
       warning,
-      message: 'ACCESS DENIED — LOCKDOWN ENGAGED — NODE LOCKED',
+      message: isCriticalGameOver
+        ? 'FATAL ERROR — NEURAL LINK DESTROYED — GAME OVER'
+        : 'ACCESS DENIED — LOCKDOWN — CIRCUIT LOCKDOWN ENGAGED',
     },
   }
 }
@@ -548,6 +615,18 @@ export function discoverHiddenLinks(
         discoveredLinks: [],
         discoveredNodes: [],
         message: 'NETWORK ERROR — CIRCUIT NOT FOUND',
+      },
+    }
+  }
+
+  // Check if circuit is blocked
+  if (state.blockedCircuits?.[circuitId] === true) {
+    return {
+      newState: state,
+      result: {
+        discoveredLinks: [],
+        discoveredNodes: [],
+        message: 'CIRCUIT IN LOCKDOWN — SCAN DISABLED',
       },
     }
   }
@@ -638,6 +717,18 @@ export function moveToNode(
         success: false,
         newPosition: state.position,
         message: 'NETWORK ERROR — CIRCUIT NOT FOUND',
+      },
+    }
+  }
+
+  // Check if circuit is blocked
+  if (state.blockedCircuits?.[circuitId] === true) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'CIRCUIT IN LOCKDOWN — MOVEMENT DISABLED',
       },
     }
   }
@@ -955,6 +1046,18 @@ export function switchCircuit(
         success: false,
         newPosition: state.position,
         message: 'ALREADY ON THIS CIRCUIT',
+      },
+    }
+  }
+
+  // Check if target circuit is blocked
+  if (state.blockedCircuits?.[targetCircuitId] === true) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'TARGET CIRCUIT IS LOCKED — ACCESS DENIED',
       },
     }
   }

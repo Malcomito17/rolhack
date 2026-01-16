@@ -161,6 +161,7 @@ const DEFAULT_TEMPLATES = [
       showCentralTerminal: true,
       showStatusBar: true,
       showBootSequence: true,
+      mapStyle: 'graph',
     }),
     effects: JSON.stringify({
       scanlines: true,
@@ -194,6 +195,7 @@ const DEFAULT_TEMPLATES = [
       showCentralTerminal: true,
       showStatusBar: true,
       showBootSequence: true,
+      mapStyle: 'breadcrumb',
     }),
     effects: JSON.stringify({
       scanlines: true,
@@ -228,6 +230,7 @@ const DEFAULT_TEMPLATES = [
       showCentralTerminal: true,
       showStatusBar: true,
       showBootSequence: true,
+      mapStyle: 'graph',
     }),
     effects: JSON.stringify({
       scanlines: false,
@@ -262,6 +265,7 @@ const DEFAULT_TEMPLATES = [
       showCentralTerminal: true,
       showStatusBar: true,
       showBootSequence: false,
+      mapStyle: 'breadcrumb',
     }),
     effects: JSON.stringify({
       scanlines: false,

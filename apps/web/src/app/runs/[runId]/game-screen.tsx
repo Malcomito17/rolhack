@@ -15,6 +15,7 @@ interface VisualTemplate {
     showNodeMap: boolean
     showSidePanel: boolean
     showCentralTerminal: boolean
+    mapStyle?: 'graph' | 'breadcrumb' | 'none'
   }
   effects: {
     scanlines: boolean
@@ -213,6 +214,7 @@ export function GameScreen({
         projectData={projectData}
         theme={immersiveTheme}
         effects={immersiveEffects}
+        mapStyle={visualTemplate.components.mapStyle || 'graph'}
         onStateChange={setState}
         onToggleView={toggleViewMode}
         createdAt={createdAt}
