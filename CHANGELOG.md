@@ -5,6 +5,52 @@ Todos los cambios notables en RolHack se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.1.0] - 2026-01-16
+
+### Sistema de Temas Visuales
+
+Nueva infraestructura para soportar múltiples ambientaciones temáticas más allá del cyberpunk.
+
+### Agregado
+
+#### Temas Temáticos
+- **Medieval**: Mazmorras con terminología de runas, cámaras y pergaminos
+- **Horror/Cthulhu**: Ambientación lovecraftiana con nexos, dimensiones e invocaciones
+- 4 nuevas plantillas: dungeon-classic, castle-siege, eldritch-depths, madness-asylum
+
+#### Terminología Dinámica
+- Sistema completo de terminología por tema
+- Mapa lateral con labels temáticos (HACKED → CONQUISTADA, PENDING → INEXPLORADA)
+- Pantallas de lockdown con mensajes temáticos
+- Pantallas de game over con iconos y textos según tema
+- Mensajes de boot, éxito y fallo personalizados
+
+#### Componentes de Tema
+- `ThemeContext`: Contexto React para gestión de tema activo
+- `BackgroundLayer`: Fondos con patrones CSS (grid, stone, eldritch)
+- `ThemedEffects`: Efectos visuales temáticos (fog, dust, fireEmbers, tentacles)
+- Tipos extendidos en `ThemeDefinition` y `ThemeTerminology`
+
+#### Validaciones
+- CD (Challenge Difficulty): rango 1-20 en editor e interfaz de juego
+- Level: rango 0-10 en editores (tabla y visual)
+- Clamping automático de valores fuera de rango
+
+#### UX Improvements
+- Botón @ siempre visible para descubrir enlaces ocultos
+- Funciona silenciosamente (sin efecto si no hay enlaces ocultos)
+- Posicionado junto al campo de hack
+
+### Modificado
+- `circuit-map.tsx`: Acepta terminología como prop
+- `immersive-view.tsx`: Usa ThemeContext y terminología dinámica
+- `demo-immersive-view.tsx`: Mismas mejoras que immersive-view
+- `table-editor.tsx`: Validaciones de CD y Level
+- `visual-editor.tsx`: Validaciones de CD y Level
+- `seed.ts`: 4 nuevos templates temáticos con terminología completa
+
+---
+
 ## [1.0.0] - 2026-01-15
 
 ### Primera versión estable de RolHack

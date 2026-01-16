@@ -160,12 +160,13 @@ export async function createRun(
   const initialState = initializeRunState(projectData)
 
   // Create run in database
+  const runName = name || `Run ${new Date().toLocaleDateString()}`
   const run = await prisma.run.create({
     data: {
       projectId,
       definitionId: definition.id,
       ownerUserId: userId,
-      name: name || `Run ${new Date().toLocaleDateString()}`,
+      name: runName,
       status: 'ACTIVE',
       state: JSON.stringify(initialState),
     },
@@ -173,6 +174,7 @@ export async function createRun(
 
   return {
     runId: run.id,
+    runName: run.name,
     state: initialState,
   }
 }

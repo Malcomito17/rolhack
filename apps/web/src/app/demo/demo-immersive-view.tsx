@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import type { ProjectData, RunState } from '@/lib/engine'
 import type { AttemptHackResult, DiscoverLinksResult, MoveToNodeResult } from '@/lib/engine/types'
 import { CircuitMap } from '../runs/[runId]/circuit-map'
+import { BackgroundLayer, ThemedEffects } from '@/components/theme'
+import type { ThemeDefinition, ThemeEffects, ThemeTerminology, SemanticColors } from '@/lib/theme'
+import { DEFAULT_TERMINOLOGY, DEFAULT_SEMANTIC_COLORS, DEFAULT_EFFECTS } from '@/lib/theme'
 
 interface Props {
   projectName: string
@@ -15,12 +18,10 @@ interface Props {
     secondaryColor: string
     textColor: string
     bgColor: string
+    semanticColors?: Partial<SemanticColors>
+    terminology?: Partial<ThemeTerminology>
   }
-  effects: {
-    scanlines: boolean
-    glitch: boolean
-    flicker: boolean
-  }
+  effects: Partial<ThemeEffects>
   onHack: (inputValue: number) => AttemptHackResult
   onDiscover: () => DiscoverLinksResult
   onMove: (targetNodeId: string) => MoveToNodeResult
@@ -37,6 +38,25 @@ export function DemoImmersiveView({
   onMove,
 }: Props) {
   const { primaryColor, secondaryColor, textColor, bgColor } = theme
+
+  // Get semantic colors from theme (for node states)
+  const semanticColors = useMemo<SemanticColors>(() => ({
+    ...DEFAULT_SEMANTIC_COLORS,
+    ...(theme.semanticColors || {}),
+    hackedNode: theme.semanticColors?.hackedNode || primaryColor,
+  }), [theme.semanticColors, primaryColor])
+
+  // Get terminology from theme (for UI labels)
+  const terminology = useMemo<ThemeTerminology>(() => ({
+    ...DEFAULT_TERMINOLOGY,
+    ...(theme.terminology || {}),
+  }), [theme.terminology])
+
+  // Merge effects with defaults
+  const mergedEffects = useMemo<ThemeEffects>(() => ({
+    ...DEFAULT_EFFECTS,
+    ...effects,
+  }), [effects])
 
   const [loading, setLoading] = useState(false)
   const [hackInput, setHackInput] = useState('')
@@ -236,18 +256,14 @@ export function DemoImmersiveView({
 
   return (
     <div
-      className={`h-screen flex flex-col font-mono relative overflow-hidden ${effects.flicker ? 'animate-flicker' : ''}`}
+      className={`h-screen flex flex-col font-mono relative overflow-hidden ${mergedEffects.flicker ? 'animate-flicker' : ''}`}
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      {/* Scanlines overlay */}
-      {effects.scanlines && (
-        <div className="absolute inset-0 pointer-events-none z-50 bg-scanlines opacity-10" />
-      )}
+      {/* Background layer (image, overlay, pattern) */}
+      <BackgroundLayer theme={theme as Partial<ThemeDefinition>} />
 
-      {/* Glitch effect */}
-      {effects.glitch && (
-        <div className="absolute inset-0 pointer-events-none z-40 animate-glitch" />
-      )}
+      {/* Themed effects (scanlines, glitch, fog, embers, etc.) */}
+      <ThemedEffects effects={mergedEffects} primaryColor={primaryColor} />
 
       {/* Background gradient */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${primaryColor}08, ${bgColor})` }} />
@@ -316,7 +332,7 @@ export function DemoImmersiveView({
         >
           <div className="max-w-4xl mx-auto flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-0.5">
             {/* Node info */}
-            <span style={{ color: `${primaryColor}88` }}>NODE:</span>
+            <span style={{ color: `${primaryColor}88` }}>{terminology.node.toUpperCase()}:</span>
             <span style={{ color: primaryColor }}>{currentNode?.name || '???'}</span>
 
             <span className="hidden sm:inline" style={{ color: `${primaryColor}33` }}>|</span>
@@ -330,13 +346,13 @@ export function DemoImmersiveView({
             {/* Status */}
             <span style={{ color: `${primaryColor}88` }}>STATUS:</span>
             <span style={{
-              color: currentNodeState?.hackeado ? primaryColor :
-                     currentNodeState?.bloqueado ? '#ff5555' :
-                     '#ffff55'
+              color: currentNodeState?.hackeado ? semanticColors.hackedNode :
+                     currentNodeState?.bloqueado ? semanticColors.blockedNode :
+                     semanticColors.pendingNode
             }}>
-              {currentNodeState?.hackeado ? 'HACKED' :
-               currentNodeState?.bloqueado ? 'BLOCKED' :
-               'SECURE'}
+              {currentNodeState?.hackeado ? terminology.hacked.toUpperCase() :
+               currentNodeState?.bloqueado ? terminology.blocked.toUpperCase() :
+               terminology.secure.toUpperCase()}
             </span>
 
             {/* Available moves */}
@@ -388,9 +404,22 @@ export function DemoImmersiveView({
                       <input
                         type="number"
                         value={hackInput}
-                        onChange={(e) => setHackInput(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 20)) {
+                            setHackInput(val)
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = parseInt(e.target.value)
+                          if (!isNaN(val)) {
+                            setHackInput(String(Math.max(1, Math.min(20, val))))
+                          }
+                        }}
                         onKeyPress={handleKeyPress}
-                        placeholder="CODE"
+                        placeholder="1-20"
+                        min={1}
+                        max={20}
                         className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1 text-center text-xs sm:text-sm focus:outline-none"
                         style={{
                           border: `1px solid ${primaryColor}88`,
@@ -407,24 +436,25 @@ export function DemoImmersiveView({
                           color: primaryColor,
                         }}
                       >
-                        BREACH
+                        {terminology.breach.toUpperCase()}
+                      </button>
+                      {/* Scan button - always visible, only works when hidden links available */}
+                      <button
+                        onClick={() => {
+                          if (hasHiddenLinks()) {
+                            doDiscover()
+                          }
+                        }}
+                        disabled={loading}
+                        className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
+                        style={{
+                          border: `1px solid ${secondaryColor}88`,
+                          color: secondaryColor,
+                        }}
+                      >
+                        @
                       </button>
                     </div>
-                  )}
-
-                  {/* Scan button */}
-                  {hasHiddenLinks() && (
-                    <button
-                      onClick={doDiscover}
-                      disabled={loading}
-                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                      style={{
-                        border: `1px solid ${secondaryColor}`,
-                        color: secondaryColor,
-                      }}
-                    >
-                      SCAN
-                    </button>
                   )}
 
                   {/* Move buttons */}
@@ -439,7 +469,7 @@ export function DemoImmersiveView({
                         color: primaryColor,
                       }}
                     >
-                      <span className="hidden sm:inline">JUMP: </span>{node.name}
+                      <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
                     </button>
                   ))}
 
@@ -450,8 +480,8 @@ export function DemoImmersiveView({
                       disabled={loading}
                       className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
                       style={{
-                        border: '1px solid #ffff5588',
-                        color: '#ffff55',
+                        border: `1px solid ${semanticColors.pendingNode}88`,
+                        color: semanticColors.pendingNode,
                       }}
                     >
                       &gt; {node.name}
@@ -481,6 +511,7 @@ export function DemoImmersiveView({
               circuit={currentCircuit}
               state={state}
               theme={{ primaryColor, secondaryColor, textColor, bgColor }}
+              semanticColors={semanticColors}
               mapStyle="graph"
               currentNodeId={state.position.nodeId}
             />

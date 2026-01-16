@@ -266,6 +266,7 @@ export interface CreateRunInput {
 
 export interface CreateRunResult {
   runId: string
+  runName: string | null
   state: RunState
 }
 

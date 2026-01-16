@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import type { ProjectData, RunState, Warning, CircuitDefinition, StateSnapshot } from '@/lib/engine'
 import { Timeline, ReplayIndicator } from './timeline'
 import { AuditView } from './audit-view'
 import { SharePanel } from '@/components/share-panel'
 import { CircuitMap, type MapStyle } from './circuit-map'
+import { BackgroundLayer, ThemedEffects } from '@/components/theme'
+import type { ThemeDefinition, ThemeEffects, ThemeTerminology, SemanticColors } from '@/lib/theme'
+import { DEFAULT_TERMINOLOGY, DEFAULT_SEMANTIC_COLORS, DEFAULT_EFFECTS } from '@/lib/theme'
 
 interface Props {
   runId: string
@@ -15,17 +18,8 @@ interface Props {
   runName: string | null
   state: RunState
   projectData: ProjectData
-  theme: Record<string, string>
-  effects: {
-    scanlines: boolean
-    glitch: boolean
-    flicker: boolean
-    neonGlow?: boolean
-    matrixRain?: boolean
-    crtCurve?: boolean
-    warningPulse?: boolean
-    radarSweep?: boolean
-  }
+  theme: Record<string, unknown>
+  effects: Partial<ThemeEffects>
   mapStyle?: MapStyle
   onStateChange: (newState: RunState) => void
   onToggleView: () => void
@@ -51,10 +45,29 @@ export function ImmersiveView({
   isSuperAdmin = false,
 }: Props) {
   // Get theme colors with fallbacks
-  const primaryColor = theme.primaryColor || '#00ff00'
-  const secondaryColor = theme.secondaryColor || '#003300'
-  const textColor = theme.textColor || '#00ff00'
-  const bgColor = theme.background || '#000000'
+  const primaryColor = (theme.primaryColor as string) || '#00ff00'
+  const secondaryColor = (theme.secondaryColor as string) || '#003300'
+  const textColor = (theme.textColor as string) || '#00ff00'
+  const bgColor = (theme.background as string) || '#000000'
+
+  // Get semantic colors from theme (for node states)
+  const semanticColors = useMemo<SemanticColors>(() => ({
+    ...DEFAULT_SEMANTIC_COLORS,
+    ...(theme.semanticColors as Partial<SemanticColors> || {}),
+    hackedNode: (theme.semanticColors as Partial<SemanticColors>)?.hackedNode || primaryColor,
+  }), [theme.semanticColors, primaryColor])
+
+  // Get terminology from theme (for UI labels)
+  const terminology = useMemo<ThemeTerminology>(() => ({
+    ...DEFAULT_TERMINOLOGY,
+    ...(theme.terminology as Partial<ThemeTerminology> || {}),
+  }), [theme.terminology])
+
+  // Merge effects with defaults
+  const mergedEffects = useMemo<ThemeEffects>(() => ({
+    ...DEFAULT_EFFECTS,
+    ...effects,
+  }), [effects])
 
   // Circuit selector state
   const [showCircuitSelector, setShowCircuitSelector] = useState(false)
@@ -343,25 +356,36 @@ export function ImmersiveView({
     setTerminalLines(prev => [...prev.slice(-50), { type, text }])
   }
 
-  // Initial boot sequence
+  // Initial boot sequence (uses terminology.bootMessages if available)
   useEffect(() => {
     const bootSequence = async () => {
-      addLine('system', '> INITIALIZING NEURAL INTERFACE...')
-      await new Promise(r => setTimeout(r, 300))
-      addLine('system', `> CONNECTED TO: ${projectName.toUpperCase()}`)
-      await new Promise(r => setTimeout(r, 200))
-      addLine('system', `> CURRENT NODE: ${currentNode?.name || 'UNKNOWN'}`)
-      await new Promise(r => setTimeout(r, 200))
-      if (currentNodeState?.hackeado) {
-        addLine('success', '> STATUS: NODE COMPROMISED')
-      } else if (currentNodeState?.bloqueado) {
-        addLine('error', '> STATUS: NODE LOCKED - BLACK ICE ACTIVE')
-      } else {
-        addLine('info', '> STATUS: AWAITING BREACH ATTEMPT')
+      const bootMessages = terminology.bootMessages || [
+        '> INITIALIZING NEURAL INTERFACE...',
+        '> ESTABLISHING SECURE CONNECTION...',
+        '> READY FOR INPUT...',
+      ]
+
+      // Play boot messages
+      for (const msg of bootMessages) {
+        addLine('system', msg)
+        await new Promise(r => setTimeout(r, 250))
       }
-      addLine('system', '> READY FOR INPUT...')
+
+      addLine('system', `> ${terminology.circuit.toUpperCase()}: ${projectName.toUpperCase()}`)
+      await new Promise(r => setTimeout(r, 200))
+      addLine('system', `> ${terminology.node.toUpperCase()}: ${currentNode?.name || 'UNKNOWN'}`)
+      await new Promise(r => setTimeout(r, 200))
+
+      if (currentNodeState?.hackeado) {
+        addLine('success', `> STATUS: ${terminology.hacked.toUpperCase()}`)
+      } else if (currentNodeState?.bloqueado) {
+        addLine('error', `> STATUS: ${terminology.blocked.toUpperCase()}`)
+      } else {
+        addLine('info', `> STATUS: ${terminology.secure.toUpperCase()}`)
+      }
     }
     bootSequence()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Scroll to bottom on new lines
@@ -505,35 +529,16 @@ export function ImmersiveView({
 
   return (
     <div
-      className={`h-screen flex flex-col font-mono relative overflow-hidden ${effects.flicker ? 'animate-flicker' : ''} ${effects.crtCurve ? 'crt-curve' : ''} ${circuitTransition ? 'circuit-transition' : ''}`}
+      className={`h-screen flex flex-col font-mono relative overflow-hidden ${mergedEffects.flicker ? 'animate-flicker' : ''} ${mergedEffects.crtCurve ? 'crt-curve' : ''} ${circuitTransition ? 'circuit-transition' : ''}`}
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      {/* Scanlines overlay */}
-      {effects.scanlines && (
-        <div className="absolute inset-0 pointer-events-none z-50 bg-scanlines opacity-10" />
-      )}
+      {/* Background layer (image, overlay, pattern) */}
+      <BackgroundLayer theme={theme as Partial<ThemeDefinition>} />
 
-      {/* Glitch effect */}
-      {effects.glitch && (
-        <div className="absolute inset-0 pointer-events-none z-40 animate-glitch" />
-      )}
+      {/* Themed effects (scanlines, glitch, fog, embers, etc.) */}
+      <ThemedEffects effects={mergedEffects} primaryColor={primaryColor} />
 
-      {/* Matrix rain background effect */}
-      {effects.matrixRain && (
-        <div className="absolute inset-0 pointer-events-none z-0 matrix-rain" style={{ '--rain-color': primaryColor } as React.CSSProperties} />
-      )}
-
-      {/* Warning pulse effect */}
-      {effects.warningPulse && (
-        <div className="absolute inset-0 pointer-events-none z-0 animate-warning-pulse" style={{ '--pulse-color': primaryColor } as React.CSSProperties} />
-      )}
-
-      {/* Radar sweep effect */}
-      {effects.radarSweep && (
-        <div className="absolute inset-0 pointer-events-none z-0 radar-sweep" style={{ '--radar-color': primaryColor } as React.CSSProperties} />
-      )}
-
-      {/* Background gradient */}
+      {/* Background gradient overlay */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${primaryColor}08, ${bgColor})` }} />
 
       {/* Replay Mode Indicator */}
@@ -808,24 +813,24 @@ export function ImmersiveView({
                 <span className="hidden sm:inline" style={{ color: `${primaryColor}33` }}>|</span>
               </>
             )}
-            <span style={{ color: `${primaryColor}88` }}>NODE:</span>
+            <span style={{ color: `${primaryColor}88` }}>{terminology.node.toUpperCase()}:</span>
             <span className="font-bold truncate max-w-[100px] sm:max-w-none" style={{
-              color: currentNodeState?.hackeado ? primaryColor :
-                     currentNodeState?.bloqueado ? '#ff5555' :
-                     '#ffff55'
+              color: currentNodeState?.hackeado ? semanticColors.hackedNode :
+                     currentNodeState?.bloqueado ? semanticColors.blockedNode :
+                     semanticColors.pendingNode
             }}>
               {currentNode?.name || 'UNKNOWN'}
             </span>
             <span className="hidden sm:inline" style={{ color: `${primaryColor}33` }}>|</span>
             <span style={{ color: `${primaryColor}88` }}>STATUS:</span>
             <span style={{
-              color: currentNodeState?.hackeado ? primaryColor :
-                     currentNodeState?.bloqueado ? '#ff5555' :
-                     '#ffff55'
+              color: currentNodeState?.hackeado ? semanticColors.hackedNode :
+                     currentNodeState?.bloqueado ? semanticColors.blockedNode :
+                     semanticColors.pendingNode
             }}>
-              {currentNodeState?.hackeado ? 'OK' :
-               currentNodeState?.bloqueado ? 'LOCK' :
-               'SEC'}
+              {currentNodeState?.hackeado ? terminology.hacked.slice(0, 4).toUpperCase() :
+               currentNodeState?.bloqueado ? terminology.blocked.slice(0, 4).toUpperCase() :
+               terminology.secure.slice(0, 3).toUpperCase()}
             </span>
             {availableMoves.fastTravel.length > 0 && (
               <>
@@ -909,9 +914,23 @@ export function ImmersiveView({
                         <input
                           type="number"
                           value={hackInput}
-                          onChange={(e) => setHackInput(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            // Allow empty for typing, but clamp on blur
+                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 20)) {
+                              setHackInput(val)
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value)
+                            if (!isNaN(val)) {
+                              setHackInput(String(Math.max(1, Math.min(20, val))))
+                            }
+                          }}
                           onKeyPress={handleKeyPress}
-                          placeholder="CODE"
+                          placeholder="1-20"
+                          min={1}
+                          max={20}
                           className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1 text-center text-xs sm:text-sm focus:outline-none"
                           style={{
                             border: `1px solid ${primaryColor}88`,
@@ -928,24 +947,25 @@ export function ImmersiveView({
                             color: primaryColor,
                           }}
                         >
-                          BREACH
+                          {terminology.breach.toUpperCase()}
+                        </button>
+                        {/* Scan button - always visible, only works when hidden links available */}
+                        <button
+                          onClick={() => {
+                            if (hasHiddenLinks()) {
+                              doDiscover()
+                            }
+                          }}
+                          disabled={loading}
+                          className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
+                          style={{
+                            border: `1px solid ${secondaryColor}88`,
+                            color: secondaryColor,
+                          }}
+                        >
+                          @
                         </button>
                       </div>
-                    )}
-
-                    {/* Scan button */}
-                    {hasHiddenLinks() && (
-                      <button
-                        onClick={doDiscover}
-                        disabled={loading}
-                        className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                        style={{
-                          border: `1px solid ${secondaryColor}`,
-                          color: secondaryColor,
-                        }}
-                      >
-                        SCAN
-                      </button>
                     )}
 
                     {/* Move buttons */}
@@ -960,7 +980,7 @@ export function ImmersiveView({
                           color: primaryColor,
                         }}
                       >
-                        <span className="hidden sm:inline">JUMP: </span>{node.name}
+                        <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
                       </button>
                     ))}
 
@@ -971,8 +991,8 @@ export function ImmersiveView({
                         disabled={loading}
                         className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
                         style={{
-                          border: '1px solid #ffff5588',
-                          color: '#ffff55',
+                          border: `1px solid ${semanticColors.pendingNode}88`,
+                          color: semanticColors.pendingNode,
                         }}
                       >
                         &gt; {node.name}
@@ -1003,6 +1023,8 @@ export function ImmersiveView({
               circuit={currentCircuit}
               state={displayState}
               theme={{ primaryColor, secondaryColor, textColor, bgColor }}
+              semanticColors={semanticColors}
+              terminology={terminology}
               mapStyle={mapStyle}
               currentNodeId={displayState.position.nodeId}
             />
@@ -1039,7 +1061,7 @@ export function ImmersiveView({
               className="text-8xl mb-6"
               style={{ animation: 'pulse 0.5s ease-in-out infinite' }}
             >
-              🔒
+              {terminology.lockdownIcon}
             </div>
 
             {/* Main message */}
@@ -1051,7 +1073,7 @@ export function ImmersiveView({
                 animation: 'pulse 1s ease-in-out infinite',
               }}
             >
-              CIRCUIT LOCKDOWN
+              {terminology.circuitLockdown}
             </h1>
 
             {/* Circuit name */}
@@ -1059,7 +1081,7 @@ export function ImmersiveView({
               className="text-xl sm:text-2xl mb-4 font-mono"
               style={{ color: '#ffaa00' }}
             >
-              {currentCircuit?.name || 'UNKNOWN CIRCUIT'}
+              {currentCircuit?.name || terminology.circuit.toUpperCase()}
             </div>
 
             {/* Terminal-style details */}
@@ -1067,10 +1089,11 @@ export function ImmersiveView({
               className="text-left font-mono text-xs sm:text-sm p-4 rounded mb-6 mx-auto max-w-md"
               style={{ backgroundColor: '#1a0a00', border: '1px solid #ff660044', color: '#ff9944' }}
             >
-              <p className="mb-1">&gt; INTRUSION DETECTED</p>
-              <p className="mb-1">&gt; SECURITY PROTOCOL ACTIVATED</p>
-              <p className="mb-1">&gt; ALL ACCESS TO THIS CIRCUIT REVOKED</p>
-              <p>&gt; SEEK ALTERNATE ROUTE...</p>
+              {terminology.lockdownMessages.map((msg, i) => (
+                <p key={i} className={i < terminology.lockdownMessages.length - 1 ? 'mb-1' : ''}>
+                  &gt; {msg}
+                </p>
+              ))}
             </div>
 
             {/* Action buttons */}
@@ -1089,7 +1112,7 @@ export function ImmersiveView({
                     textShadow: `0 0 10px ${primaryColor}`,
                   }}
                 >
-                  SELECT NEW CIRCUIT
+                  {terminology.selectNewCircuit}
                 </button>
               ) : (
                 <Link
@@ -1102,7 +1125,7 @@ export function ImmersiveView({
                     textShadow: '0 0 10px #ff0000',
                   }}
                 >
-                  NO ROUTES AVAILABLE - EXIT
+                  {terminology.noRoutesExit}
                 </Link>
               )}
             </div>
@@ -1130,15 +1153,15 @@ export function ImmersiveView({
 
           {/* Game Over content */}
           <div className="relative z-10 text-center p-8 max-w-lg">
-            {/* Skull/explosion icon */}
-            <div className="text-8xl mb-6 animate-pulse">💀</div>
+            {/* Icon */}
+            <div className="text-8xl mb-6 animate-pulse">{terminology.gameOverIcon}</div>
 
             {/* Main message */}
             <h1
               className="text-4xl sm:text-5xl font-bold mb-4 tracking-wider animate-pulse"
               style={{ color: '#ff0000', textShadow: '0 0 20px #ff0000, 0 0 40px #ff000088' }}
             >
-              GAME OVER
+              {terminology.gameOver}
             </h1>
 
             {/* Sub message */}
@@ -1146,7 +1169,7 @@ export function ImmersiveView({
               className="text-lg sm:text-xl mb-6 font-mono"
               style={{ color: '#ff5555' }}
             >
-              <p className="mb-2">NEURAL LINK DESTROYED</p>
+              <p className="mb-2">{terminology.gameOverSubtitle}</p>
               <p className="text-sm opacity-75">{gameOverMessage}</p>
             </div>
 
@@ -1155,10 +1178,11 @@ export function ImmersiveView({
               className="text-left font-mono text-xs sm:text-sm p-4 rounded mb-6 mx-auto max-w-md"
               style={{ backgroundColor: '#1a0000', border: '1px solid #ff000044', color: '#ff5555' }}
             >
-              <p className="mb-1">&gt; CRITICAL SYSTEM FAILURE</p>
-              <p className="mb-1">&gt; BLACK ICE COUNTERMEASURE ACTIVATED</p>
-              <p className="mb-1">&gt; OPERATOR CONNECTION TERMINATED</p>
-              <p>&gt; RUN STATUS: FAILED</p>
+              {terminology.gameOverMessages.map((msg, i) => (
+                <p key={i} className={i < terminology.gameOverMessages.length - 1 ? 'mb-1' : ''}>
+                  &gt; {msg}
+                </p>
+              ))}
             </div>
 
             {/* Action button */}
@@ -1172,7 +1196,7 @@ export function ImmersiveView({
                 textShadow: '0 0 10px #ff0000',
               }}
             >
-              DISCONNECT
+              {terminology.disconnect}
             </Link>
           </div>
         </div>

@@ -267,18 +267,26 @@ export function VisualEditor({
                   <input
                     type="number"
                     value={newNode.level}
-                    onChange={(e) => setNewNode({ ...newNode, level: parseInt(e.target.value) || 0 })}
-                    placeholder="Level"
+                    onChange={(e) => {
+                      const val = Math.max(0, Math.min(10, parseInt(e.target.value) || 0))
+                      setNewNode({ ...newNode, level: val })
+                    }}
+                    placeholder="Level (0-10)"
                     className="w-20 bg-cyber-dark border border-gray-700 rounded px-3 py-2 text-sm"
                     min={0}
+                    max={10}
                   />
                   <input
                     type="number"
                     value={newNode.cd}
-                    onChange={(e) => setNewNode({ ...newNode, cd: parseInt(e.target.value) || 0 })}
-                    placeholder="CD"
+                    onChange={(e) => {
+                      const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                      setNewNode({ ...newNode, cd: val })
+                    }}
+                    placeholder="CD (1-20)"
                     className="w-20 bg-cyber-dark border border-gray-700 rounded px-3 py-2 text-sm"
-                    min={0}
+                    min={1}
+                    max={20}
                   />
                 </div>
               </div>
@@ -395,16 +403,24 @@ export function VisualEditor({
                               <input
                                 type="number"
                                 value={node.level}
-                                onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { level: parseInt(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                  const val = Math.max(0, Math.min(10, parseInt(e.target.value) || 0))
+                                  onUpdateNode(selectedCircuitId!, node.id, { level: val })
+                                }}
                                 className="w-16 bg-cyber-dark border border-gray-600 rounded px-2 py-1 text-sm"
                                 min={0}
+                                max={10}
                               />
                               <input
                                 type="number"
                                 value={node.cd}
-                                onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { cd: parseInt(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                  const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                                  onUpdateNode(selectedCircuitId!, node.id, { cd: val })
+                                }}
                                 className="w-16 bg-cyber-dark border border-gray-600 rounded px-2 py-1 text-sm"
-                                min={0}
+                                min={1}
+                                max={20}
                               />
                             </div>
                             <select

@@ -30,9 +30,8 @@ export function TableEditor({
 }: Props) {
   const [activeTable, setActiveTable] = useState<'nodes' | 'links'>('nodes')
 
-  // New node form state
+  // New node form state (ID is auto-generated)
   const [newNode, setNewNode] = useState<{
-    id: string
     name: string
     description: string
     level: number
@@ -40,7 +39,6 @@ export function TableEditor({
     failMode: FailMode
     visibleByDefault: boolean
   }>({
-    id: '',
     name: '',
     description: '',
     level: 0,
@@ -49,16 +47,14 @@ export function TableEditor({
     visibleByDefault: true,
   })
 
-  // New link form state
+  // New link form state (ID is auto-generated)
   const [newLink, setNewLink] = useState<{
-    id: string
     from: string
     to: string
     style: LinkStyle
     hidden: boolean
     bidirectional: boolean
   }>({
-    id: '',
     from: '',
     to: '',
     style: 'solid',
@@ -66,11 +62,18 @@ export function TableEditor({
     bidirectional: true,
   })
 
+  // Generate unique IDs
+  const generateNodeId = () => `node-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+  const generateLinkId = () => `link-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+
   const handleAddNode = () => {
-    if (!selectedCircuitId || !newNode.id || !newNode.name) return
-    onAddNode(selectedCircuitId, newNode)
+    if (!selectedCircuitId || !newNode.name) return
+    const nodeWithId: NodeDefinition = {
+      ...newNode,
+      id: generateNodeId(),
+    }
+    onAddNode(selectedCircuitId, nodeWithId)
     setNewNode({
-      id: '',
       name: '',
       description: '',
       level: 0,
@@ -81,10 +84,13 @@ export function TableEditor({
   }
 
   const handleAddLink = () => {
-    if (!selectedCircuitId || !newLink.id || !newLink.from || !newLink.to) return
-    onAddLink(selectedCircuitId, newLink)
+    if (!selectedCircuitId || !newLink.from || !newLink.to) return
+    const linkWithId: LinkDefinition = {
+      ...newLink,
+      id: generateLinkId(),
+    }
+    onAddLink(selectedCircuitId, linkWithId)
     setNewLink({
-      id: '',
       from: '',
       to: '',
       style: 'solid',
@@ -177,18 +183,26 @@ export function TableEditor({
                         <input
                           type="number"
                           value={node.level}
-                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { level: parseInt(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            const val = Math.max(0, Math.min(10, parseInt(e.target.value) || 0))
+                            onUpdateNode(selectedCircuitId, node.id, { level: val })
+                          }}
                           className="w-16 bg-transparent border-b border-transparent hover:border-gray-600 focus:border-cyber-primary focus:outline-none px-1 py-0.5 text-center"
                           min={0}
+                          max={10}
                         />
                       </td>
                       <td className="py-2 px-2">
                         <input
                           type="number"
                           value={node.cd}
-                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { cd: parseInt(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                            onUpdateNode(selectedCircuitId, node.id, { cd: val })
+                          }}
                           className="w-16 bg-transparent border-b border-transparent hover:border-gray-600 focus:border-cyber-primary focus:outline-none px-1 py-0.5 text-center"
-                          min={0}
+                          min={1}
+                          max={20}
                         />
                       </td>
                       <td className="py-2 px-2">
@@ -222,13 +236,7 @@ export function TableEditor({
                   {/* Add new node row */}
                   <tr className="bg-gray-800/30">
                     <td className="py-2 px-2">
-                      <input
-                        type="text"
-                        value={newNode.id}
-                        onChange={(e) => setNewNode({ ...newNode, id: e.target.value })}
-                        placeholder="node-id"
-                        className="w-full bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-xs font-mono"
-                      />
+                      <span className="text-xs text-gray-500 italic">Auto</span>
                     </td>
                     <td className="py-2 px-2">
                       <input
@@ -243,18 +251,26 @@ export function TableEditor({
                       <input
                         type="number"
                         value={newNode.level}
-                        onChange={(e) => setNewNode({ ...newNode, level: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(10, parseInt(e.target.value) || 0))
+                          setNewNode({ ...newNode, level: val })
+                        }}
                         className="w-16 bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-sm text-center"
                         min={0}
+                        max={10}
                       />
                     </td>
                     <td className="py-2 px-2">
                       <input
                         type="number"
                         value={newNode.cd}
-                        onChange={(e) => setNewNode({ ...newNode, cd: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                          setNewNode({ ...newNode, cd: val })
+                        }}
                         className="w-16 bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-sm text-center"
-                        min={0}
+                        min={1}
+                        max={20}
                       />
                     </td>
                     <td className="py-2 px-2">
@@ -278,7 +294,7 @@ export function TableEditor({
                     <td className="py-2 px-2">
                       <button
                         onClick={handleAddNode}
-                        disabled={!newNode.id || !newNode.name}
+                        disabled={!newNode.name}
                         className="text-cyber-primary hover:text-cyber-primary/80 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Agregar
@@ -371,13 +387,7 @@ export function TableEditor({
                   {/* Add new link row */}
                   <tr className="bg-gray-800/30">
                     <td className="py-2 px-2">
-                      <input
-                        type="text"
-                        value={newLink.id}
-                        onChange={(e) => setNewLink({ ...newLink, id: e.target.value })}
-                        placeholder="link-id"
-                        className="w-full bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-xs font-mono"
-                      />
+                      <span className="text-xs text-gray-500 italic">Auto</span>
                     </td>
                     <td className="py-2 px-2">
                       <select
@@ -433,7 +443,7 @@ export function TableEditor({
                     <td className="py-2 px-2">
                       <button
                         onClick={handleAddLink}
-                        disabled={!newLink.id || !newLink.from || !newLink.to}
+                        disabled={!newLink.from || !newLink.to}
                         className="text-cyber-secondary hover:text-cyber-secondary/80 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Agregar

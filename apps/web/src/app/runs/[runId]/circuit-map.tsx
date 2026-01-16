@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react'
 import type { CircuitDefinition, RunState } from '@/lib/engine'
+import type { SemanticColors, ThemeTerminology } from '@/lib/theme'
+import { DEFAULT_SEMANTIC_COLORS, DEFAULT_TERMINOLOGY } from '@/lib/theme'
 
 export type MapStyle = 'graph' | 'breadcrumb' | 'none'
 
@@ -14,6 +16,8 @@ interface CircuitMapProps {
     textColor: string
     bgColor: string
   }
+  semanticColors?: Partial<SemanticColors>
+  terminology?: Partial<ThemeTerminology>
   mapStyle: MapStyle
   currentNodeId: string
 }
@@ -33,10 +37,25 @@ export function CircuitMap({
   circuit,
   state,
   theme,
+  semanticColors: semanticColorsProp,
+  terminology: terminologyProp,
   mapStyle,
   currentNodeId,
 }: CircuitMapProps) {
   const { primaryColor, secondaryColor, textColor, bgColor } = theme
+
+  // Merge semantic colors with defaults
+  const semanticColors = useMemo<SemanticColors>(() => ({
+    ...DEFAULT_SEMANTIC_COLORS,
+    ...semanticColorsProp,
+    hackedNode: semanticColorsProp?.hackedNode || primaryColor,
+  }), [semanticColorsProp, primaryColor])
+
+  // Merge terminology with defaults
+  const terminology = useMemo<ThemeTerminology>(() => ({
+    ...DEFAULT_TERMINOLOGY,
+    ...terminologyProp,
+  }), [terminologyProp])
 
   // Build the node display data
   const nodeDisplays = useMemo(() => {
@@ -123,12 +142,12 @@ export function CircuitMap({
     return '○'
   }
 
-  // Get node color based on state
+  // Get node color based on state (using semantic colors)
   const getNodeColor = (node: NodeDisplay) => {
-    if (node.isCurrent) return '#00ffff' // Cyan for current
-    if (node.isBlocked) return '#ff5555' // Red for blocked
-    if (node.isHacked) return primaryColor // Green for hacked
-    return '#ffff55' // Yellow for pending
+    if (node.isCurrent) return semanticColors.currentNode
+    if (node.isBlocked) return semanticColors.blockedNode
+    if (node.isHacked) return semanticColors.hackedNode
+    return semanticColors.pendingNode
   }
 
   if (mapStyle === 'none') return null
@@ -146,9 +165,9 @@ export function CircuitMap({
           style={{ borderColor: `${primaryColor}33` }}
         >
           <span style={{ color: `${primaryColor}66` }}>[</span>
-          <span style={{ color: primaryColor }}>MAP</span>
+          <span style={{ color: primaryColor }}>{terminology.map}</span>
           <span style={{ color: `${primaryColor}66` }}>]</span>
-          <span style={{ color: textColor }} className="opacity-60">NETWORK_GRID</span>
+          <span style={{ color: textColor }} className="opacity-60">{terminology.mapGrid}</span>
         </div>
 
         {/* Node tree */}
@@ -181,7 +200,7 @@ export function CircuitMap({
                 <span
                   className={`truncate ${node.isCurrent ? 'font-bold' : ''}`}
                   style={{
-                    color: node.isCurrent ? '#00ffff' : textColor,
+                    color: node.isCurrent ? semanticColors.currentNode : textColor,
                     maxWidth: '100px',
                   }}
                   title={node.name}
@@ -191,7 +210,7 @@ export function CircuitMap({
 
                 {/* Current indicator */}
                 {node.isCurrent && (
-                  <span style={{ color: '#00ffff' }} className="animate-pulse">←</span>
+                  <span style={{ color: semanticColors.currentNode }} className="animate-pulse">←</span>
                 )}
               </div>
             )
@@ -211,32 +230,32 @@ export function CircuitMap({
         >
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1">
-              <span style={{ color: primaryColor }}>◉</span>
-              <span style={{ color: `${textColor}88` }}>HACKED</span>
+              <span style={{ color: semanticColors.hackedNode }}>◉</span>
+              <span style={{ color: `${textColor}88` }}>{terminology.hacked}</span>
             </span>
-            <span style={{ color: primaryColor }}>{stats.hacked}</span>
+            <span style={{ color: semanticColors.hackedNode }}>{stats.hacked}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1">
-              <span style={{ color: '#ffff55' }}>○</span>
-              <span style={{ color: `${textColor}88` }}>PENDING</span>
+              <span style={{ color: semanticColors.pendingNode }}>○</span>
+              <span style={{ color: `${textColor}88` }}>{terminology.pending}</span>
             </span>
-            <span style={{ color: '#ffff55' }}>{stats.discovered - stats.hacked - stats.blocked}</span>
+            <span style={{ color: semanticColors.pendingNode }}>{stats.discovered - stats.hacked - stats.blocked}</span>
           </div>
           {stats.blocked > 0 && (
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1">
-                <span style={{ color: '#ff5555' }}>×</span>
-                <span style={{ color: `${textColor}88` }}>BLOCKED</span>
+                <span style={{ color: semanticColors.blockedNode }}>×</span>
+                <span style={{ color: `${textColor}88` }}>{terminology.blocked}</span>
               </span>
-              <span style={{ color: '#ff5555' }}>{stats.blocked}</span>
+              <span style={{ color: semanticColors.blockedNode }}>{stats.blocked}</span>
             </div>
           )}
           {stats.undiscovered > 0 && (
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <span style={{ color: `${textColor}44` }}>?</span>
-                <span style={{ color: `${textColor}88` }}>HIDDEN</span>
+                <span style={{ color: `${textColor}88` }}>{terminology.hidden}</span>
               </span>
               <span style={{ color: `${textColor}44` }}>{stats.undiscovered}</span>
             </div>
@@ -258,9 +277,9 @@ export function CircuitMap({
         style={{ borderColor: `${primaryColor}33` }}
       >
         <span style={{ color: `${primaryColor}66` }}>[</span>
-        <span style={{ color: primaryColor }}>MAP</span>
+        <span style={{ color: primaryColor }}>{terminology.map}</span>
         <span style={{ color: `${primaryColor}66` }}>]</span>
-        <span style={{ color: textColor }} className="opacity-60">ROUTE_TRACE</span>
+        <span style={{ color: textColor }} className="opacity-60">{terminology.mapRoute}</span>
       </div>
 
       {/* Breadcrumb trail */}
@@ -274,7 +293,7 @@ export function CircuitMap({
               <div className="flex items-center gap-2">
                 {/* Current marker */}
                 {node.isCurrent && (
-                  <span style={{ color: '#00ffff' }} className="animate-pulse">►</span>
+                  <span style={{ color: semanticColors.currentNode }} className="animate-pulse">►</span>
                 )}
                 {!node.isCurrent && <span className="w-3" />}
 
@@ -327,21 +346,21 @@ export function CircuitMap({
           style={{ backgroundColor: `${primaryColor}33` }}
         />
         <div className="flex items-center justify-between">
-          <span style={{ color: `${textColor}88` }}>PROGRESS</span>
+          <span style={{ color: `${textColor}88` }}>{terminology.progress}</span>
           <span style={{ color: primaryColor }}>
             {stats.hacked}/{stats.total}
           </span>
         </div>
         {stats.undiscovered > 0 && (
           <div className="flex items-center justify-between">
-            <span style={{ color: `${textColor}88` }}>HIDDEN</span>
+            <span style={{ color: `${textColor}88` }}>{terminology.hidden}</span>
             <span style={{ color: `${textColor}44` }}>{stats.undiscovered}</span>
           </div>
         )}
         {stats.blocked > 0 && (
           <div className="flex items-center justify-between">
-            <span style={{ color: `${textColor}88` }}>BLOCKED</span>
-            <span style={{ color: '#ff5555' }}>{stats.blocked}</span>
+            <span style={{ color: `${textColor}88` }}>{terminology.blocked}</span>
+            <span style={{ color: semanticColors.blockedNode }}>{stats.blocked}</span>
           </div>
         )}
       </div>
