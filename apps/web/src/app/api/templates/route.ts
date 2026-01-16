@@ -20,9 +20,10 @@ export async function GET() {
     return NextResponse.json({
       templates: templates.map((t) => ({
         id: t.id,
+        key: t.key,
         name: t.name,
         description: t.description,
-        layout: t.layout,
+        renderer: t.renderer,
         theme: JSON.parse(t.theme),
         components: JSON.parse(t.components),
         effects: JSON.parse(t.effects),

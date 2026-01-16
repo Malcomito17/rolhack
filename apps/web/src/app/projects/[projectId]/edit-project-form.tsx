@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 
 interface Template {
   id: string
+  key: string
   name: string
   description: string | null
-  layout: string
+  renderer: string
 }
 
 interface Props {
@@ -142,7 +143,7 @@ export function EditProjectForm({ projectId, initialName, initialDescription, in
               <option value="">Sin plantilla (TECH por defecto)</option>
               {templates.map(t => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.layout})
+                  {t.name} ({t.renderer})
                 </option>
               ))}
             </select>

@@ -68,8 +68,9 @@ export async function GET(
       visualTemplate: project.visualTemplate
         ? {
             id: project.visualTemplate.id,
+            key: project.visualTemplate.key,
             name: project.visualTemplate.name,
-            layout: project.visualTemplate.layout,
+            renderer: project.visualTemplate.renderer,
             theme: JSON.parse(project.visualTemplate.theme),
             components: JSON.parse(project.visualTemplate.components),
             effects: JSON.parse(project.visualTemplate.effects),
@@ -197,8 +198,9 @@ export async function PATCH(
       visualTemplate: updated.visualTemplate
         ? {
             id: updated.visualTemplate.id,
+            key: updated.visualTemplate.key,
             name: updated.visualTemplate.name,
-            layout: updated.visualTemplate.layout,
+            renderer: updated.visualTemplate.renderer,
           }
         : null,
       message: 'Proyecto actualizado',

@@ -1,15 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+
+interface Template {
+  id: string
+  key: string
+  name: string
+  description: string | null
+  renderer: string
+}
 
 export function CreateProjectButton() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [templateId, setTemplateId] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Fetch templates when modal opens
+  useEffect(() => {
+    if (isOpen && templates.length === 0) {
+      fetch('/api/templates')
+        .then(res => res.json())
+        .then(data => {
+          if (data.templates) {
+            setTemplates(data.templates)
+            // Set default template
+            const defaultTpl = data.templates.find((t: Template) => t.key === 'default-tech')
+            if (defaultTpl) {
+              setTemplateId(defaultTpl.id)
+            }
+          }
+        })
+        .catch(console.error)
+    }
+  }, [isOpen, templates.length])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,7 +49,7 @@ export function CreateProjectButton() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, visualTemplateId: templateId }),
       })
 
       const data = await res.json()
@@ -32,6 +61,7 @@ export function CreateProjectButton() {
       setIsOpen(false)
       setName('')
       setDescription('')
+      setTemplateId(null)
       router.push(`/projects/${data.id}`)
       router.refresh()
     } catch (err) {
@@ -87,6 +117,30 @@ export function CreateProjectButton() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Plantilla Visual
+            </label>
+            <select
+              value={templateId || ''}
+              onChange={(e) => setTemplateId(e.target.value || null)}
+              className="w-full bg-cyber-darker border border-gray-700 rounded px-3 py-2 text-white focus:border-cyber-primary focus:outline-none"
+              disabled={loading}
+            >
+              <option value="">Sin plantilla</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.renderer})
+                </option>
+              ))}
+            </select>
+            {templateId && templates.find(t => t.id === templateId)?.description && (
+              <p className="text-gray-500 text-xs mt-1">
+                {templates.find(t => t.id === templateId)?.description}
+              </p>
+            )}
+          </div>
+
           {error && (
             <p className="text-red-400 text-sm">{error}</p>
           )}
@@ -98,6 +152,7 @@ export function CreateProjectButton() {
                 setIsOpen(false)
                 setName('')
                 setDescription('')
+                setTemplateId(null)
                 setError(null)
               }}
               className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors"

@@ -5,6 +5,7 @@ import { isSuperAdmin, getProjectRole } from '@/lib/rbac'
 import { prisma } from '@rolhack/database'
 import { CreateRunButton } from './create-run-button'
 import { EditProjectForm } from './edit-project-form'
+import { RunListItem } from './run-list-item'
 
 interface Props {
   params: Promise<{ projectId: string }>
@@ -12,12 +13,13 @@ interface Props {
 
 export default async function ProjectDetailPage({ params }: Props) {
   const session = await auth()
-
-  if (!session?.user) {
-    redirect('/')
-  }
-
   const { projectId } = await params
+
+  // If not authenticated, redirect to login with return URL
+  if (!session?.user) {
+    const returnUrl = encodeURIComponent(`/projects/${projectId}`)
+    redirect(`/auth/login?callbackUrl=${returnUrl}`)
+  }
   const user = session.user
   const isAdmin = isSuperAdmin(user)
 
@@ -159,7 +161,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                 Continuar ultima run
               </Link>
             )}
-            <CreateRunButton projectId={projectId} hasActiveRun={!!lastActiveRun} />
+            <CreateRunButton projectId={projectId} projectName={project.name} hasActiveRun={!!lastActiveRun} />
           </div>
         )}
 
@@ -179,42 +181,17 @@ export default async function ProjectDetailPage({ params }: Props) {
           ) : (
             <div className="space-y-3">
               {runs.map((run) => (
-                <div
+                <RunListItem
                   key={run.id}
-                  className="bg-cyber-dark/50 border border-gray-800 hover:border-gray-700 rounded-lg p-4 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className="text-white font-medium truncate">
-                          {run.name || `Run ${run.id.slice(0, 8)}`}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          run.status === 'ACTIVE'
-                            ? 'bg-cyber-primary/20 text-cyber-primary'
-                            : 'bg-gray-700 text-gray-400'
-                        }`}>
-                          {run.status}
-                        </span>
-                      </div>
-                      <p className="text-gray-500 text-xs">
-                        Actualizado: {new Date(run.updatedAt).toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/runs/${run.id}`}
-                      className="px-4 py-2 bg-cyber-secondary/10 border border-cyber-secondary/30 hover:bg-cyber-secondary/20 text-cyber-secondary rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Jugar
-                    </Link>
-                  </div>
-                </div>
+                  run={{
+                    id: run.id,
+                    name: run.name,
+                    status: run.status,
+                    createdAt: run.createdAt.toISOString(),
+                    updatedAt: run.updatedAt.toISOString(),
+                  }}
+                  projectName={project.name}
+                />
               ))}
             </div>
           )}

@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, visualTemplateId } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
@@ -113,11 +113,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate template exists if provided
+    if (visualTemplateId) {
+      const template = await prisma.visualTemplate.findUnique({
+        where: { id: visualTemplateId },
+      })
+      if (!template) {
+        return NextResponse.json(
+          { error: 'Template no encontrado' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Create project with SUPERADMIN as OWNER
     const project = await prisma.project.create({
       data: {
         name: name.trim(),
         description: description?.trim() || null,
+        visualTemplateId: visualTemplateId || null,
         enabled: true,
         members: {
           create: {
