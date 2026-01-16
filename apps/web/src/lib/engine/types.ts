@@ -126,6 +126,53 @@ export interface Position {
 }
 
 /**
+ * Timeline event types - milestones in a RUN
+ */
+export type TimelineEventType =
+  | 'RUN_START'
+  | 'CIRCUIT_SELECTED'
+  | 'NODE_HACKED'
+  | 'NODE_BLOCKED'
+  | 'LINKS_DISCOVERED'
+  | 'CIRCUIT_CHANGED'
+  | 'CIRCUIT_COMPLETED'
+  | 'RUN_COMPLETED'
+
+/**
+ * Snapshot of state at a point in time (for visual replay)
+ * Contains only what's needed for observation, not full state
+ */
+export interface StateSnapshot {
+  position: Position
+  nodes: Record<string, NodeState>
+  links: Record<string, LinkState>
+}
+
+/**
+ * Timeline event - a milestone in the RUN progression
+ * Used for visual replay and progress understanding
+ * NOT for logic rollback - purely observational
+ */
+export interface TimelineEvent {
+  id: string
+  type: TimelineEventType
+  timestamp: string // ISO 8601
+  circuitId: string
+  nodeId?: string
+  // Human-readable description
+  description: string
+  // Optional additional context
+  details?: {
+    discoveredLinks?: string[]
+    discoveredNodes?: string[]
+    warningGenerated?: boolean
+    previousCircuitId?: string
+  }
+  // State snapshot for visual replay (observation only)
+  snapshot: StateSnapshot
+}
+
+/**
  * Complete run state stored in Run.state
  */
 export interface RunState {
@@ -134,7 +181,76 @@ export interface RunState {
   nodes: Record<string, NodeState>
   links: Record<string, LinkState>
   warnings: Warning[]
+  // Timeline for visual replay (UI-only feature, doesn't affect logic)
+  timeline: TimelineEvent[]
 }
+
+// =============================================================================
+// AUDIT & DEMO TYPES (Observation-only features)
+// =============================================================================
+
+/**
+ * Observation mode for the run view
+ * - 'live': Normal interactive mode
+ * - 'replay': Viewing historical state (from timeline)
+ * - 'demo': Full demo/explanation mode (frozen, guided)
+ * - 'audit': Audit view mode (comprehensive overview)
+ */
+export type ObservationMode = 'live' | 'replay' | 'demo' | 'audit'
+
+/**
+ * Circuit audit summary for comprehensive view
+ */
+export interface CircuitAuditSummary {
+  id: string
+  name: string
+  description?: string
+  totalNodes: number
+  hackedNodes: number
+  blockedNodes: number
+  discoveredNodes: number
+  progress: number // 0-100
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'ADVANCED' | 'COMPLETED' | 'BLOCKED'
+  isCurrentCircuit: boolean
+  // Timeline events for this circuit
+  events: TimelineEvent[]
+}
+
+/**
+ * Full audit data for a run
+ */
+export interface RunAuditData {
+  runId: string
+  runName: string | null
+  projectName: string
+  createdAt: string
+  // Overall progress
+  totalCircuits: number
+  completedCircuits: number
+  totalNodes: number
+  hackedNodes: number
+  blockedNodes: number
+  // Per-circuit breakdown
+  circuits: CircuitAuditSummary[]
+  // Full timeline
+  timeline: TimelineEvent[]
+  // Current position (if viewing live state)
+  currentPosition: Position
+}
+
+/**
+ * Export format options
+ */
+export type ExportFormat = 'text' | 'markdown' | 'json'
+
+/**
+ * Export content type
+ */
+export type ExportContentType =
+  | 'timeline_summary'
+  | 'circuit_overview'
+  | 'full_audit'
+  | 'checkpoint_snapshot'
 
 // =============================================================================
 // SERVICE TYPES (Input/Output for engine operations)
@@ -180,6 +296,17 @@ export interface MoveToNodeInput {
 }
 
 export interface MoveToNodeResult {
+  success: boolean
+  newPosition: Position
+  message: string
+}
+
+export interface SwitchCircuitInput {
+  runId: string
+  targetCircuitId: string
+}
+
+export interface SwitchCircuitResult {
   success: boolean
   newPosition: Position
   message: string

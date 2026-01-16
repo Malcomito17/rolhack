@@ -37,6 +37,13 @@ export {
   getAvailableMoves,
   getAccessibleNodes, // @deprecated - use getAvailableMoves
   getCurrentNodeInfo,
+  // Circuit navigation
+  switchCircuit,
+  getCircuitSummary,
+  // Audit functions (observation-only)
+  generateAuditData,
+  exportTimeline,
+  exportAuditSummary,
 } from './engine'
 
 // Database services
@@ -51,6 +58,7 @@ export {
   attemptHackService,
   discoverLinksService,
   moveToNodeService,
+  switchCircuitService,
   getRunInfo,
   listUserRuns,
   listAllRuns,

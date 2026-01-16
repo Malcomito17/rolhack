@@ -92,12 +92,50 @@ export const PositionSchema = z.object({
   nodeId: z.string(),
 })
 
+// Timeline event types for visual replay
+export const TimelineEventTypeSchema = z.enum([
+  'RUN_START',
+  'CIRCUIT_SELECTED',
+  'NODE_HACKED',
+  'NODE_BLOCKED',
+  'LINKS_DISCOVERED',
+  'CIRCUIT_CHANGED',
+  'CIRCUIT_COMPLETED',
+  'RUN_COMPLETED',
+])
+
+// State snapshot for visual replay (observation only)
+export const StateSnapshotSchema = z.object({
+  position: PositionSchema,
+  nodes: z.record(z.string(), NodeStateSchema),
+  links: z.record(z.string(), LinkStateSchema),
+})
+
+// Timeline event for visual replay
+export const TimelineEventSchema = z.object({
+  id: z.string(),
+  type: TimelineEventTypeSchema,
+  timestamp: z.string(),
+  circuitId: z.string(),
+  nodeId: z.string().optional(),
+  description: z.string(),
+  details: z.object({
+    discoveredLinks: z.array(z.string()).optional(),
+    discoveredNodes: z.array(z.string()).optional(),
+    warningGenerated: z.boolean().optional(),
+    previousCircuitId: z.string().optional(),
+  }).optional(),
+  snapshot: StateSnapshotSchema,
+})
+
 export const RunStateSchema = z.object({
   position: PositionSchema,
   lastHackedNodeByCircuit: z.record(z.string(), z.string()),
   nodes: z.record(z.string(), NodeStateSchema),
   links: z.record(z.string(), LinkStateSchema),
   warnings: z.array(WarningSchema),
+  // Timeline for visual replay - optional for backward compatibility with existing runs
+  timeline: z.array(TimelineEventSchema).optional().default([]),
 })
 
 // =============================================================================

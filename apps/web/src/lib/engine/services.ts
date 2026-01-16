@@ -9,6 +9,7 @@ import {
   attemptHack as engineAttemptHack,
   discoverHiddenLinks as engineDiscoverLinks,
   moveToNode as engineMoveToNode,
+  switchCircuit as engineSwitchCircuit,
   hasHiddenLinksAvailable,
 } from './engine'
 import { parseProjectData, parseRunState } from './schemas'
@@ -19,6 +20,7 @@ import type {
   AttemptHackResult,
   DiscoverLinksResult,
   MoveToNodeResult,
+  SwitchCircuitResult,
 } from './types'
 
 // =============================================================================
@@ -351,6 +353,7 @@ export async function listAllRuns(): Promise<RunListItem[]> {
 
 /**
  * Check if user can access a run
+ * Allows: SUPERADMIN, run owner, or project members
  */
 export async function canAccessRun(
   userId: string,
@@ -361,10 +364,23 @@ export async function canAccessRun(
 
   const run = await prisma.run.findUnique({
     where: { id: runId },
-    select: { ownerUserId: true },
+    select: { ownerUserId: true, projectId: true },
   })
 
-  return run?.ownerUserId === userId
+  if (!run) return false
+
+  // Owner can always access
+  if (run.ownerUserId === userId) return true
+
+  // Check if user is a member of the project
+  const membership = await prisma.projectMember.findUnique({
+    where: {
+      projectId_userId: { projectId: run.projectId, userId },
+    },
+    select: { active: true },
+  })
+
+  return membership?.active === true
 }
 
 /**
@@ -396,4 +412,28 @@ export async function canCreateRunInProject(
   })
 
   return project?.enabled === true && project?.deletedAt === null
+}
+
+// =============================================================================
+// SWITCH CIRCUIT SERVICE
+// =============================================================================
+
+export async function switchCircuitService(
+  runId: string,
+  targetCircuitId: string
+): Promise<SwitchCircuitResult> {
+  const { runState, projectData } = await getRunWithDefinition(runId)
+
+  const { newState, result } = engineSwitchCircuit(
+    runState,
+    projectData,
+    targetCircuitId
+  )
+
+  // Save state if changed
+  if (newState !== runState) {
+    await saveRunState(runId, newState)
+  }
+
+  return result
 }
