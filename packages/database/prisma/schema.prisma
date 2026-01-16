@@ -101,11 +101,12 @@ model User {
 
 model VisualTemplate {
   id          String  @id @default(cuid())
-  name        String  @unique
+  key         String  @unique // Unique identifier (e.g., default-tech, matrix-immersive)
+  name        String
   description String?
 
-  // Layout type: TECH | IMMERSIVE
-  layout String @default("TECH")
+  // Renderer type: TECH | IMMERSIVE
+  renderer String @default("TECH")
 
   // Theme configuration (JSON)
   theme String @default("{}") // { background, colors, font }
