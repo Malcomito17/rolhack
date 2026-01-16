@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { isSuperAdmin } from '@/lib/rbac'
 import { prisma } from '@rolhack/database'
 import { AdminProjectActions } from './admin-project-actions'
+import { UsersList } from './users-list'
 
 export default async function AdminPage() {
   const session = await auth()
@@ -41,6 +42,26 @@ export default async function AdminPage() {
     },
   })
 
+  // Get all users
+  const users = await prisma.user.findMany({
+    where: { deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      image: true,
+      roleGlobal: true,
+      createdAt: true,
+      _count: {
+        select: {
+          projectMemberships: true,
+          runs: true,
+        },
+      },
+    },
+  })
+
   return (
     <main className="min-h-screen p-8">
       <div className="max-w-4xl mx-auto">
@@ -71,6 +92,23 @@ export default async function AdminPage() {
             <p className="text-3xl font-bold text-cyber-primary">{runCount}</p>
             <p className="text-gray-400 text-sm">Runs</p>
           </div>
+        </div>
+
+        {/* Users list */}
+        <div className="mb-8">
+          <UsersList
+            users={users.map((u) => ({
+              id: u.id,
+              email: u.email,
+              name: u.name,
+              image: u.image,
+              roleGlobal: u.roleGlobal,
+              createdAt: u.createdAt.toISOString(),
+              projectCount: u._count.projectMemberships,
+              runCount: u._count.runs,
+            }))}
+            currentUserId={user.id}
+          />
         </div>
 
         {/* Projects list */}
