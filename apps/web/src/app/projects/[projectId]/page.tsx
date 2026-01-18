@@ -191,6 +191,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                     updatedAt: run.updatedAt.toISOString(),
                   }}
                   projectName={project.name}
+                  canManage={canManage}
                 />
               ))}
             </div>
