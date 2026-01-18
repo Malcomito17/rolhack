@@ -17,9 +17,10 @@ interface Props {
   run: Run
   projectName: string
   canManage?: boolean
+  ownerName?: string
 }
 
-export function RunListItem({ run, projectName, canManage = false }: Props) {
+export function RunListItem({ run, projectName, canManage = false, ownerName }: Props) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(run.name || '')
@@ -118,15 +119,22 @@ export function RunListItem({ run, projectName, canManage = false }: Props) {
               {run.status}
             </span>
           </div>
-          <p className="text-gray-500 text-xs">
-            Actualizado: {new Date(run.updatedAt).toLocaleDateString('es-ES', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
+          <div className="flex items-center gap-3 text-gray-500 text-xs">
+            {ownerName && (
+              <span className="text-cyber-accent">
+                {ownerName}
+              </span>
+            )}
+            <span>
+              Actualizado: {new Date(run.updatedAt).toLocaleDateString('es-ES', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Management actions for OWNER/SUPERADMIN */}

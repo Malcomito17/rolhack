@@ -51,11 +51,12 @@ export default async function ProjectDetailPage({ params }: Props) {
     notFound()
   }
 
-  // Get user's runs for this project
+  // Get runs for this project
+  // SUPERADMIN sees all runs, others see only their own
   const runs = await prisma.run.findMany({
     where: {
       projectId,
-      ownerUserId: user.id,
+      ...(isAdmin ? {} : { ownerUserId: user.id }),
       deletedAt: null,
     },
     orderBy: { updatedAt: 'desc' },
@@ -65,6 +66,14 @@ export default async function ProjectDetailPage({ params }: Props) {
       status: true,
       createdAt: true,
       updatedAt: true,
+      ownerUserId: true,
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   })
 
@@ -168,12 +177,14 @@ export default async function ProjectDetailPage({ params }: Props) {
         {/* Runs list */}
         <div>
           <h2 className="text-xl font-semibold text-white mb-4">
-            Mis Runs ({runs.length})
+            {isAdmin ? `Todas las Runs (${runs.length})` : `Mis Runs (${runs.length})`}
           </h2>
 
           {runs.length === 0 ? (
             <div className="bg-cyber-dark/50 border border-gray-800 rounded-lg p-8 text-center">
-              <p className="text-gray-400">No tienes runs en este proyecto</p>
+              <p className="text-gray-400">
+                {isAdmin ? 'No hay runs en este proyecto' : 'No tienes runs en este proyecto'}
+              </p>
               <p className="text-gray-600 text-sm mt-1">
                 Crea una nueva run para comenzar a jugar
               </p>
@@ -192,6 +203,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                   }}
                   projectName={project.name}
                   canManage={canManage}
+                  ownerName={isAdmin && run.ownerUserId !== user.id ? (run.owner.name || run.owner.email) : undefined}
                 />
               ))}
             </div>
