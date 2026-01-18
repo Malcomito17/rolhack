@@ -6,14 +6,24 @@ import { prisma } from '@rolhack/database'
 import { CreateRunButton } from './create-run-button'
 import { EditProjectForm } from './edit-project-form'
 import { RunListItem } from './run-list-item'
+import { RunSortControls } from './run-sort-controls'
+
+type SortField = 'date' | 'name' | 'user'
+type SortOrder = 'asc' | 'desc'
 
 interface Props {
   params: Promise<{ projectId: string }>
+  searchParams: Promise<{ sort?: string; order?: string }>
 }
 
-export default async function ProjectDetailPage({ params }: Props) {
+export default async function ProjectDetailPage({ params, searchParams }: Props) {
   const session = await auth()
   const { projectId } = await params
+  const { sort, order } = await searchParams
+
+  // Parse sorting params
+  const sortField: SortField = ['date', 'name', 'user'].includes(sort || '') ? (sort as SortField) : 'date'
+  const sortOrder: SortOrder = order === 'asc' ? 'asc' : 'desc'
 
   // If not authenticated, redirect to login with return URL
   if (!session?.user) {
@@ -51,6 +61,19 @@ export default async function ProjectDetailPage({ params }: Props) {
     notFound()
   }
 
+  // Build orderBy based on sort params
+  const getOrderBy = () => {
+    switch (sortField) {
+      case 'name':
+        return { name: sortOrder }
+      case 'user':
+        return { owner: { name: sortOrder } }
+      case 'date':
+      default:
+        return { updatedAt: sortOrder }
+    }
+  }
+
   // Get runs for this project
   // SUPERADMIN sees all runs, others see only their own
   const runs = await prisma.run.findMany({
@@ -59,7 +82,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       ...(isAdmin ? {} : { ownerUserId: user.id }),
       deletedAt: null,
     },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: getOrderBy(),
     select: {
       id: true,
       name: true,
@@ -176,9 +199,14 @@ export default async function ProjectDetailPage({ params }: Props) {
 
         {/* Runs list */}
         <div>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            {isAdmin ? `Todas las Runs (${runs.length})` : `Mis Runs (${runs.length})`}
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              {isAdmin ? `Todas las Runs (${runs.length})` : `Mis Runs (${runs.length})`}
+            </h2>
+            {runs.length > 1 && (
+              <RunSortControls showUserSort={isAdmin} />
+            )}
+          </div>
 
           {runs.length === 0 ? (
             <div className="bg-cyber-dark/50 border border-gray-800 rounded-lg p-8 text-center">
