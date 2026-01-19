@@ -28,8 +28,14 @@ export interface NodeDefinition {
   description?: string
   level: number // 0 = entry point, higher = deeper in the network
   cd: number // Challenge Difficulty - value needed to hack
-  failMode: FailMode // What happens on failed hack attempt
+  criticalFailMode: FailMode // What happens on rolls 1-2 (critical failure)
+  rangeFailMode: FailMode // What happens on rolls 3 to CD-1 (range failure)
+  rangeErrorMessage?: string // Custom message for WARNING in range failure
   visibleByDefault: boolean // Is this node visible at run start?
+  isFinal?: boolean // Final node - hacking completes the circuit (only 1 per circuit)
+  // Map positioning (for visual circuit map)
+  mapX?: number // X coordinate (0-100 percentage)
+  mapY?: number // Y coordinate (0-100 percentage)
 }
 
 /**
@@ -186,6 +192,8 @@ export interface RunState {
   timeline: TimelineEvent[]
   // Blocked circuits - when a BLOQUEO occurs, entire circuit is locked
   blockedCircuits: Record<string, boolean>
+  // Completed circuits - when final node is hacked, circuit is complete
+  completedCircuits: Record<string, boolean>
 }
 
 // =============================================================================
@@ -281,6 +289,7 @@ export interface AttemptHackResult {
   hackeado: boolean
   bloqueado: boolean
   circuitBlocked?: boolean // True if entire circuit is now blocked
+  circuitCompleted?: boolean // True if final node was hacked (circuit complete)
   gameOver?: boolean // True if this is a critical game-ending failure (CD=1-2 + block)
   warning?: Warning
   message: string

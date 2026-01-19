@@ -42,9 +42,21 @@ export function VisualEditor({
 
   // Form states
   const [newCircuit, setNewCircuit] = useState({ id: '', name: '', description: '' })
-  const [newNode, setNewNode] = useState({
-    id: '', name: '', description: '', level: 0, cd: 1, failMode: 'WARNING' as const, visibleByDefault: true
+  const [newNode, setNewNode] = useState<{
+    name: string
+    description: string
+    level: number
+    cd: number
+    criticalFailMode: 'WARNING' | 'BLOQUEO'
+    rangeFailMode: 'WARNING' | 'BLOQUEO'
+    rangeErrorMessage: string
+    visibleByDefault: boolean
+  }>({
+    name: '', description: '', level: 0, cd: 11, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true
   })
+
+  // Auto-generate unique IDs
+  const generateNodeId = () => `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const [newLink, setNewLink] = useState({
     id: '', from: '', to: '', style: 'solid' as const, hidden: false, bidirectional: true
   })
@@ -69,9 +81,13 @@ export function VisualEditor({
   }
 
   const handleAddNode = () => {
-    if (!selectedCircuitId || !newNode.id || !newNode.name) return
-    onAddNode(selectedCircuitId, newNode)
-    setNewNode({ id: '', name: '', description: '', level: 0, cd: 1, failMode: 'WARNING', visibleByDefault: true })
+    if (!selectedCircuitId || !newNode.name) return
+    const nodeWithId: NodeDefinition = {
+      ...newNode,
+      id: generateNodeId(),
+    }
+    onAddNode(selectedCircuitId, nodeWithId)
+    setNewNode({ name: '', description: '', level: 0, cd: 11, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true })
     setShowAddNode(false)
   }
 
@@ -251,13 +267,6 @@ export function VisualEditor({
               <div className="grid grid-cols-3 gap-3">
                 <input
                   type="text"
-                  value={newNode.id}
-                  onChange={(e) => setNewNode({ ...newNode, id: e.target.value })}
-                  placeholder="node-id"
-                  className="bg-cyber-dark border border-gray-700 rounded px-3 py-2 text-sm font-mono"
-                />
-                <input
-                  type="text"
                   value={newNode.name}
                   onChange={(e) => setNewNode({ ...newNode, name: e.target.value })}
                   placeholder="Nombre"
@@ -271,7 +280,7 @@ export function VisualEditor({
                       const val = Math.max(0, Math.min(10, parseInt(e.target.value) || 0))
                       setNewNode({ ...newNode, level: val })
                     }}
-                    placeholder="Level (0-10)"
+                    placeholder="Level"
                     className="w-20 bg-cyber-dark border border-gray-700 rounded px-3 py-2 text-sm"
                     min={0}
                     max={10}
@@ -280,20 +289,48 @@ export function VisualEditor({
                     type="number"
                     value={newNode.cd}
                     onChange={(e) => {
-                      const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                      const val = Math.max(3, parseInt(e.target.value) || 3)
                       setNewNode({ ...newNode, cd: val })
                     }}
-                    placeholder="CD (1-20)"
+                    placeholder="CD (min 3)"
                     className="w-20 bg-cyber-dark border border-gray-700 rounded px-3 py-2 text-sm"
-                    min={1}
-                    max={20}
+                    min={3}
                   />
                 </div>
+                <div className="flex gap-2">
+                  <select
+                    value={newNode.criticalFailMode}
+                    onChange={(e) => setNewNode({ ...newNode, criticalFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                    className="bg-cyber-dark border border-red-900 rounded px-2 py-2 text-sm"
+                    title="Crítico (1-2)"
+                  >
+                    <option value="WARNING">W</option>
+                    <option value="BLOQUEO">B</option>
+                  </select>
+                  <select
+                    value={newNode.rangeFailMode}
+                    onChange={(e) => setNewNode({ ...newNode, rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                    className="bg-cyber-dark border border-yellow-900 rounded px-2 py-2 text-sm"
+                    title="Rango (3 a CD-1)"
+                  >
+                    <option value="WARNING">W</option>
+                    <option value="BLOQUEO">B</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={newNode.rangeErrorMessage}
+                  onChange={(e) => setNewNode({ ...newNode, rangeErrorMessage: e.target.value })}
+                  placeholder="Mensaje de error personalizado (opcional)"
+                  className="w-full bg-cyber-dark border border-yellow-600 rounded px-3 py-2 text-sm text-yellow-400 placeholder:text-gray-500"
+                />
               </div>
               <div className="flex gap-2 mt-3">
                 <button
                   onClick={handleAddNode}
-                  disabled={!newNode.id || !newNode.name}
+                  disabled={!newNode.name}
                   className="px-3 py-1.5 text-sm bg-cyber-primary text-cyber-darker rounded disabled:opacity-50"
                 >
                   Crear
@@ -423,14 +460,37 @@ export function VisualEditor({
                                 max={20}
                               />
                             </div>
-                            <select
-                              value={node.failMode}
-                              onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { failMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
-                              className="w-full bg-cyber-dark border border-gray-600 rounded px-2 py-1 text-sm"
-                            >
-                              <option value="WARNING">WARNING</option>
-                              <option value="BLOQUEO">BLOQUEO</option>
-                            </select>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-xs text-red-400 block mb-1">Crítico (1-2)</label>
+                                <select
+                                  value={node.criticalFailMode}
+                                  onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { criticalFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                                  className="w-full bg-cyber-dark border border-red-900 rounded px-2 py-1 text-xs"
+                                >
+                                  <option value="WARNING">WARNING</option>
+                                  <option value="BLOQUEO">BLOQUEO</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-yellow-400 block mb-1">Rango (3 a CD-1)</label>
+                                <select
+                                  value={node.rangeFailMode}
+                                  onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                                  className="w-full bg-cyber-dark border border-yellow-900 rounded px-2 py-1 text-xs"
+                                >
+                                  <option value="WARNING">WARNING</option>
+                                  <option value="BLOQUEO">BLOQUEO</option>
+                                </select>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={node.rangeErrorMessage || ''}
+                              onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { rangeErrorMessage: e.target.value })}
+                              placeholder="Mensaje de error (opcional)"
+                              className="w-full bg-cyber-dark border border-yellow-600 rounded px-2 py-1 text-xs text-yellow-400 placeholder:text-gray-500"
+                            />
                             <label className="flex items-center gap-2 text-xs text-gray-400">
                               <input
                                 type="checkbox"
@@ -439,6 +499,63 @@ export function VisualEditor({
                               />
                               Visible por defecto
                             </label>
+                            {/* Final Node */}
+                            <label className="flex items-center gap-2 text-xs text-green-400">
+                              <input
+                                type="checkbox"
+                                checked={node.isFinal === true}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    // Check if another node is already final
+                                    const existingFinal = currentCircuit?.nodes.find(n => n.isFinal === true && n.id !== node.id)
+                                    if (existingFinal) {
+                                      if (confirm(`"${existingFinal.name}" ya es nodo final. ¿Cambiar a "${node.name}"?`)) {
+                                        onUpdateNode(selectedCircuitId!, existingFinal.id, { isFinal: false })
+                                        onUpdateNode(selectedCircuitId!, node.id, { isFinal: true })
+                                      }
+                                    } else {
+                                      onUpdateNode(selectedCircuitId!, node.id, { isFinal: true })
+                                    }
+                                  } else {
+                                    onUpdateNode(selectedCircuitId!, node.id, { isFinal: false })
+                                  }
+                                }}
+                              />
+                              Nodo FINAL (objetivo del circuito)
+                            </label>
+                            {/* Map Position */}
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700">
+                              <div>
+                                <label className="text-xs text-blue-400 block mb-1">Mapa X (0-100)</label>
+                                <input
+                                  type="number"
+                                  value={node.mapX ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? undefined : Number(e.target.value)
+                                    onUpdateNode(selectedCircuitId!, node.id, { mapX: val })
+                                  }}
+                                  placeholder="Auto"
+                                  min={0}
+                                  max={100}
+                                  className="w-full bg-cyber-dark border border-blue-900 rounded px-2 py-1 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-blue-400 block mb-1">Mapa Y (0-100)</label>
+                                <input
+                                  type="number"
+                                  value={node.mapY ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? undefined : Number(e.target.value)
+                                    onUpdateNode(selectedCircuitId!, node.id, { mapY: val })
+                                  }}
+                                  placeholder="Auto"
+                                  min={0}
+                                  max={100}
+                                  className="w-full bg-cyber-dark border border-blue-900 rounded px-2 py-1 text-xs"
+                                />
+                              </div>
+                            </div>
                             <div className="flex gap-2 pt-2 border-t border-gray-700">
                               <button
                                 onClick={() => setEditingNodeId(null)}
@@ -469,19 +586,39 @@ export function VisualEditor({
                               <span className="font-medium text-white text-sm truncate">
                                 {node.name}
                               </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                node.failMode === 'BLOQUEO'
-                                  ? 'bg-red-900/30 text-red-400'
-                                  : 'bg-yellow-900/30 text-yellow-400'
-                              }`}>
-                                {node.failMode}
-                              </span>
+                              <div className="flex gap-1">
+                                {/* Critical fail mode badge (1-2) */}
+                                <span
+                                  className={`text-[10px] px-1 py-0.5 rounded ${
+                                    node.criticalFailMode === 'BLOQUEO'
+                                      ? 'bg-red-900/50 text-red-400'
+                                      : 'bg-orange-900/50 text-orange-400'
+                                  }`}
+                                  title="Fallo crítico (1-2)"
+                                >
+                                  1-2:{node.criticalFailMode === 'BLOQUEO' ? 'B' : 'W'}
+                                </span>
+                                {/* Range fail mode badge (3 to CD-1) */}
+                                <span
+                                  className={`text-[10px] px-1 py-0.5 rounded ${
+                                    node.rangeFailMode === 'BLOQUEO'
+                                      ? 'bg-red-900/50 text-red-400'
+                                      : 'bg-yellow-900/50 text-yellow-400'
+                                  }`}
+                                  title={`Fallo rango (3 a ${node.cd - 1})`}
+                                >
+                                  3+:{node.rangeFailMode === 'BLOQUEO' ? 'B' : 'W'}
+                                </span>
+                              </div>
                             </div>
                             <div className="text-xs text-gray-500 space-y-0.5">
                               <p className="font-mono">{node.id}</p>
                               <p>CD: {node.cd}</p>
                               {!node.visibleByDefault && (
                                 <p className="text-cyber-accent">Oculto</p>
+                              )}
+                              {node.isFinal && (
+                                <p className="text-green-400 font-bold">FINAL</p>
                               )}
                             </div>
                           </div>

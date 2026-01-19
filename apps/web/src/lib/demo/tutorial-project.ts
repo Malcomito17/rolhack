@@ -27,7 +27,8 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Punto de entrada al sistema. Acceso garantizado.',
           level: 0,
           cd: 0, // Entry node - auto-accessible
-          failMode: 'WARNING',
+          criticalFailMode: 'WARNING',
+          rangeFailMode: 'WARNING',
           visibleByDefault: true,
         },
         {
@@ -36,7 +37,9 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Un firewall con configuracion estandar. CD: 11',
           level: 1,
           cd: 11, // Minimum CD as per requirements
-          failMode: 'WARNING',
+          criticalFailMode: 'BLOQUEO',
+          rangeFailMode: 'WARNING',
+          rangeErrorMessage: 'FIREWALL TRACE — CONEXION RECHAZADA',
           visibleByDefault: true,
         },
         {
@@ -45,7 +48,9 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Acceso alternativo descubierto mediante escaneo. CD: 12',
           level: 1,
           cd: 12,
-          failMode: 'WARNING',
+          criticalFailMode: 'BLOQUEO',
+          rangeFailMode: 'WARNING',
+          rangeErrorMessage: 'PUERTO DETECTADO — ACCESO DENEGADO',
           visibleByDefault: false, // Hidden - teaches SCAN
         },
         {
@@ -54,7 +59,9 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Servidor de datos corporativos. CD: 15',
           level: 2,
           cd: 15,
-          failMode: 'WARNING',
+          criticalFailMode: 'BLOQUEO',
+          rangeFailMode: 'WARNING',
+          rangeErrorMessage: 'DATABASE ALERT — QUERY BLOQUEADA',
           visibleByDefault: true,
         },
         {
@@ -63,7 +70,8 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Objetivo final. Maxima seguridad. CD: 20',
           level: 3,
           cd: 20, // Maximum CD as per requirements
-          failMode: 'BLOQUEO', // Teaches blocking on failure
+          criticalFailMode: 'BLOQUEO',
+          rangeFailMode: 'BLOQUEO', // Teaches blocking on failure
           visibleByDefault: true,
         },
       ],

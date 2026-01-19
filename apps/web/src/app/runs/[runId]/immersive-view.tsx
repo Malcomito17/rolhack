@@ -7,6 +7,7 @@ import { Timeline, ReplayIndicator } from './timeline'
 import { AuditView } from './audit-view'
 import { SharePanel } from '@/components/share-panel'
 import { CircuitMap, type MapStyle } from './circuit-map'
+import { NetworkMapModal } from './network-map-modal'
 import { BackgroundLayer, ThemedEffects } from '@/components/theme'
 import type { ThemeDefinition, ThemeEffects, ThemeTerminology, SemanticColors } from '@/lib/theme'
 import { DEFAULT_TERMINOLOGY, DEFAULT_SEMANTIC_COLORS, DEFAULT_EFFECTS } from '@/lib/theme'
@@ -87,10 +88,21 @@ export function ImmersiveView({
   const [showAuditView, setShowAuditView] = useState(false)
 
   // =============================================================================
+  // NETWORK MAP STATE (Visual circuit map modal)
+  // =============================================================================
+  const [showNetworkMap, setShowNetworkMap] = useState(false)
+
+  // =============================================================================
   // GAME OVER STATE (Critical failure - neural link destroyed)
   // =============================================================================
   const [showGameOver, setShowGameOver] = useState(false)
   const [gameOverMessage, setGameOverMessage] = useState('')
+
+  // =============================================================================
+  // CIRCUIT COMPLETED STATE (Success - final node hacked)
+  // =============================================================================
+  const [showCircuitCompleted, setShowCircuitCompleted] = useState(false)
+  const [completedCircuitName, setCompletedCircuitName] = useState('')
 
   // =============================================================================
   // CIRCUIT LOCKDOWN STATE (Dramatic alert when circuit gets blocked)
@@ -274,7 +286,7 @@ export function ImmersiveView({
   }
   const [loading, setLoading] = useState(false)
   const [hackInput, setHackInput] = useState('')
-  const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info'; text: string }[]>([])
+  const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info' | 'warning'; text: string }[]>([])
   const terminalRef = useRef<HTMLDivElement>(null)
 
   // Get current circuit and node (using displayState for visual representation)
@@ -296,52 +308,48 @@ export function ImmersiveView({
   }, [currentCircuit, displayState])
 
   // Get available moves (uses displayState for UI representation)
+  // Only shows nodes connected by direct link (no free fast-travel)
   const getAvailableMoves = useCallback(() => {
     if (!currentCircuit) return { fastTravel: [], advance: [] }
 
     const currentNodeId = displayState.position.nodeId
-    const fastTravel: { id: string; name: string }[] = []
-    const advance: { id: string; name: string }[] = []
+    const fastTravel: { id: string; name: string }[] = [] // Hacked adjacent nodes (retreat)
+    const advance: { id: string; name: string }[] = [] // Non-hacked adjacent nodes (advance)
 
     const currentNodeStateLocal = displayState.nodes[currentNodeId]
     const currentIsHacked = currentNodeStateLocal?.hackeado === true
 
-    for (const node of currentCircuit.nodes) {
-      if (node.id === currentNodeId) continue
-      const nodeState = displayState.nodes[node.id]
-      if (!nodeState || nodeState.inaccesible || nodeState.bloqueado) continue
+    // Only check nodes connected by direct links
+    for (const link of currentCircuit.links) {
+      const linkState = displayState.links[link.id]
+      // Link must be discovered and not blocked
+      if (!linkState?.descubierto || linkState.inaccesible) continue
 
-      if (nodeState.hackeado) {
-        fastTravel.push({ id: node.id, name: node.name })
+      // Find target node from this link
+      let targetId: string | null = null
+      if (link.from === currentNodeId) {
+        targetId = link.to
+      } else if (link.bidirectional !== false && link.to === currentNodeId) {
+        targetId = link.from
       }
-    }
 
-    if (currentIsHacked) {
-      for (const link of currentCircuit.links) {
-        const linkState = displayState.links[link.id]
-        if (!linkState?.descubierto || linkState.inaccesible) continue
+      if (!targetId) continue
 
-        let targetId: string | null = null
-        if (link.from === currentNodeId) {
-          targetId = link.to
-        } else if (link.bidirectional !== false && link.to === currentNodeId) {
-          targetId = link.from
+      const targetState = displayState.nodes[targetId]
+      const targetNode = currentCircuit.nodes.find(n => n.id === targetId)
+
+      if (!targetNode || !targetState) continue
+      if (targetState.inaccesible || targetState.bloqueado) continue
+
+      if (targetState.hackeado) {
+        // Hacked adjacent node -> retreat allowed (no restriction)
+        if (!fastTravel.find(a => a.id === targetId)) {
+          fastTravel.push({ id: targetNode.id, name: targetNode.name })
         }
-
-        if (targetId) {
-          const targetState = displayState.nodes[targetId]
-          const targetNode = currentCircuit.nodes.find(n => n.id === targetId)
-          if (
-            targetNode &&
-            targetState &&
-            targetState.descubierto &&
-            !targetState.inaccesible &&
-            !targetState.bloqueado &&
-            !targetState.hackeado &&
-            !advance.find(a => a.id === targetId)
-          ) {
-            advance.push({ id: targetNode.id, name: targetNode.name })
-          }
+      } else if (currentIsHacked && targetState.descubierto) {
+        // Non-hacked adjacent node -> advance allowed if current is hacked + target discovered
+        if (!advance.find(a => a.id === targetId)) {
+          advance.push({ id: targetNode.id, name: targetNode.name })
         }
       }
     }
@@ -352,7 +360,7 @@ export function ImmersiveView({
   const availableMoves = getAvailableMoves()
 
   // Add terminal line
-  const addLine = (type: 'system' | 'user' | 'success' | 'error' | 'info', text: string) => {
+  const addLine = (type: 'system' | 'user' | 'success' | 'error' | 'info' | 'warning', text: string) => {
     setTerminalLines(prev => [...prev.slice(-50), { type, text }])
   }
 
@@ -418,6 +426,15 @@ export function ImmersiveView({
 
       if (data.success) {
         addLine('success', `> ${data.message}`)
+
+        // Check for circuit completed (final node hacked)
+        if (data.circuitCompleted) {
+          addLine('success', '> ═══════════════════════════════════════')
+          addLine('success', `> ${terminology.circuitCompleted.toUpperCase()}`)
+          addLine('success', '> ═══════════════════════════════════════')
+          setCompletedCircuitName(currentCircuit?.name || terminology.circuit)
+          setShowCircuitCompleted(true)
+        }
       } else {
         addLine('error', `> ${data.message}`)
 
@@ -438,6 +455,13 @@ export function ImmersiveView({
           // Show the lockdown modal directly
           setLockdownCircuitId(state.position.circuitId)
           setShowLockdownAlert(true)
+        }
+        // Show WARNING message prominently (rangeFailMode or criticalFailMode = WARNING)
+        else if (data.warning) {
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('warning', `> ⚠ ${data.warning.message}`)
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('info', `> ${terminology.retryAvailable || 'RETRY AVAILABLE — SYSTEM STILL ACCESSIBLE'}`)
         }
       }
       setHackInput('')
@@ -502,6 +526,15 @@ export function ImmersiveView({
       if (data.success) {
         addLine('success', `> ${data.message}`)
         addLine('system', `> CURRENT NODE: ${targetName.toUpperCase()}`)
+
+        // Check if we arrived at a final node
+        const targetNodeDef = currentCircuit?.nodes.find(n => n.id === targetNodeId)
+        if (targetNodeDef?.isFinal) {
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('warning', `> ⚡ ${terminology.finalNode.toUpperCase()} NODE REACHED`)
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('info', `> ${terminology.circuitCompletedSubtitle || 'BREACH THIS NODE TO COMPLETE THE CIRCUIT'}`)
+        }
       } else {
         addLine('error', `> ${data.message}`)
       }
@@ -583,6 +616,15 @@ export function ImmersiveView({
 
             {/* Right: Actions */}
             <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                onClick={() => setShowNetworkMap(true)}
+                className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 border rounded opacity-60 hover:opacity-100 transition-opacity"
+                style={{ borderColor: `${secondaryColor}66`, color: secondaryColor }}
+                title={terminology.map}
+              >
+                <span className="hidden sm:inline">[M] {terminology.map.toUpperCase()}</span>
+                <span className="sm:hidden">[M]</span>
+              </button>
               <button
                 onClick={() => setShowAuditView(true)}
                 className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 border rounded opacity-60 hover:opacity-100 transition-opacity"
@@ -796,6 +838,7 @@ export function ImmersiveView({
                 line.type === 'user' ? 'text-green-400' :
                 line.type === 'success' ? 'text-green-300 font-bold' :
                 line.type === 'error' ? 'text-red-500 font-bold' :
+                line.type === 'warning' ? 'text-yellow-400 font-bold animate-pulse' :
                 'text-cyan-500'
               }`}
             >
@@ -821,6 +864,19 @@ export function ImmersiveView({
             }}>
               {currentNode?.name || 'UNKNOWN'}
             </span>
+            {/* Final node indicator */}
+            {currentNode?.isFinal && (
+              <span
+                className="px-1.5 py-0.5 rounded text-[9px] font-bold animate-pulse"
+                style={{
+                  backgroundColor: `${semanticColors.success}22`,
+                  border: `1px solid ${semanticColors.success}`,
+                  color: semanticColors.success,
+                }}
+              >
+                {terminology.finalNode}
+              </span>
+            )}
             <span className="hidden sm:inline" style={{ color: `${primaryColor}33` }}>|</span>
             <span style={{ color: `${primaryColor}88` }}>STATUS:</span>
             <span style={{
@@ -910,7 +966,20 @@ export function ImmersiveView({
                   <>
                     {/* Hack input - only show if not hacked and not blocked */}
                     {currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
-                      <div className="flex gap-1">
+                      <div className={`flex gap-1 ${currentNode?.isFinal ? 'p-1.5 rounded' : ''}`} style={currentNode?.isFinal ? {
+                        backgroundColor: `${semanticColors.success}15`,
+                        border: `2px solid ${semanticColors.success}`,
+                        boxShadow: `0 0 15px ${semanticColors.success}44, inset 0 0 20px ${semanticColors.success}11`,
+                        animation: 'pulse 2s ease-in-out infinite',
+                      } : {}}>
+                        {currentNode?.isFinal && (
+                          <span
+                            className="self-center px-2 py-1 text-[10px] sm:text-xs font-bold"
+                            style={{ color: semanticColors.success }}
+                          >
+                            {terminology.finalNode}
+                          </span>
+                        )}
                         <input
                           type="number"
                           value={hackInput}
@@ -933,8 +1002,8 @@ export function ImmersiveView({
                           max={20}
                           className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1 text-center text-xs sm:text-sm focus:outline-none"
                           style={{
-                            border: `1px solid ${primaryColor}88`,
-                            color: primaryColor,
+                            border: `1px solid ${currentNode?.isFinal ? semanticColors.success : primaryColor}88`,
+                            color: currentNode?.isFinal ? semanticColors.success : primaryColor,
                           }}
                           disabled={loading}
                         />
@@ -943,30 +1012,32 @@ export function ImmersiveView({
                           disabled={loading || !hackInput}
                           className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           style={{
-                            border: `1px solid ${primaryColor}88`,
-                            color: primaryColor,
+                            border: `1px solid ${currentNode?.isFinal ? semanticColors.success : primaryColor}88`,
+                            color: currentNode?.isFinal ? semanticColors.success : primaryColor,
+                            backgroundColor: currentNode?.isFinal ? `${semanticColors.success}22` : 'transparent',
                           }}
                         >
                           {terminology.breach.toUpperCase()}
                         </button>
-                        {/* Scan button - always visible, only works when hidden links available */}
-                        <button
-                          onClick={() => {
-                            if (hasHiddenLinks()) {
-                              doDiscover()
-                            }
-                          }}
-                          disabled={loading}
-                          className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
-                          style={{
-                            border: `1px solid ${secondaryColor}88`,
-                            color: secondaryColor,
-                          }}
-                        >
-                          @
-                        </button>
                       </div>
                     )}
+
+                    {/* Scan button - ALWAYS visible, only functional when node is hacked AND hidden links exist */}
+                    <button
+                      onClick={() => {
+                        if (currentNodeState?.hackeado && hasHiddenLinks()) {
+                          doDiscover()
+                        }
+                      }}
+                      disabled={loading}
+                      className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
+                      style={{
+                        border: `1px solid ${secondaryColor}88`,
+                        color: secondaryColor,
+                      }}
+                    >
+                      @
+                    </button>
 
                     {/* Move buttons */}
                     {availableMoves.fastTravel.map(node => (
@@ -1202,6 +1273,145 @@ export function ImmersiveView({
         </div>
       )}
 
+      {/* Circuit Completed Modal (Success - final node hacked) */}
+      {showCircuitCompleted && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90">
+          {/* Success effect background */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 animate-pulse" style={{ backgroundColor: `${primaryColor}10` }} />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `
+                  radial-gradient(circle at 50% 50%, ${primaryColor}22 0%, transparent 50%),
+                  repeating-linear-gradient(0deg, ${primaryColor}05 0px, ${primaryColor}05 2px, transparent 2px, transparent 4px)
+                `,
+              }}
+            />
+          </div>
+
+          {/* Circuit Completed content */}
+          <div className="relative z-10 text-center p-8 max-w-lg">
+            {/* Icon */}
+            <div
+              className="text-8xl mb-6"
+              style={{ animation: 'pulse 1s ease-in-out infinite' }}
+            >
+              {terminology.circuitCompletedIcon}
+            </div>
+
+            {/* Main message */}
+            <h1
+              className="text-3xl sm:text-4xl font-bold mb-4 tracking-wider"
+              style={{
+                color: primaryColor,
+                textShadow: `0 0 20px ${primaryColor}, 0 0 40px ${primaryColor}88`,
+                animation: 'pulse 2s ease-in-out infinite',
+              }}
+            >
+              {terminology.circuitCompleted}
+            </h1>
+
+            {/* Circuit name */}
+            <div
+              className="text-xl sm:text-2xl mb-4 font-mono"
+              style={{ color: secondaryColor }}
+            >
+              {completedCircuitName}
+            </div>
+
+            {/* Sub message */}
+            <div
+              className="text-sm sm:text-base mb-6 font-mono"
+              style={{ color: `${primaryColor}cc` }}
+            >
+              {terminology.circuitCompletedSubtitle}
+            </div>
+
+            {/* Terminal-style details */}
+            <div
+              className="text-left font-mono text-xs sm:text-sm p-4 rounded mb-6 mx-auto max-w-md"
+              style={{ backgroundColor: `${bgColor}ee`, border: `1px solid ${primaryColor}44`, color: primaryColor }}
+            >
+              {terminology.circuitCompletedMessages.map((msg, i) => (
+                <p key={i} className={i < terminology.circuitCompletedMessages.length - 1 ? 'mb-1' : ''}>
+                  &gt; {msg}
+                </p>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* Check if all circuits are completed */}
+              {(() => {
+                const availableCircuits = projectData.circuits.filter(
+                  c => !state.blockedCircuits?.[c.id] && !state.completedCircuits?.[c.id]
+                )
+                const allCompleted = availableCircuits.length === 0
+
+                if (allCompleted) {
+                  return (
+                    <div className="flex flex-col items-center gap-4">
+                      <div
+                        className="text-lg font-bold p-4 rounded"
+                        style={{
+                          backgroundColor: `${primaryColor}22`,
+                          border: `2px solid ${primaryColor}`,
+                          color: primaryColor,
+                        }}
+                      >
+                        {terminology.allCircuitsCompleted}
+                      </div>
+                      <Link
+                        href={`/projects/${projectId}`}
+                        className="px-6 py-3 rounded text-lg font-bold transition-all hover:scale-105"
+                        style={{
+                          backgroundColor: `${primaryColor}22`,
+                          border: `2px solid ${primaryColor}`,
+                          color: primaryColor,
+                          textShadow: `0 0 10px ${primaryColor}`,
+                        }}
+                      >
+                        {terminology.disconnect}
+                      </Link>
+                    </div>
+                  )
+                }
+
+                return (
+                  <>
+                    {hasMultipleCircuits && (
+                      <button
+                        onClick={() => {
+                          setShowCircuitCompleted(false)
+                          setShowCircuitSelector(true)
+                        }}
+                        className="px-6 py-3 rounded text-lg font-bold transition-all hover:scale-105"
+                        style={{
+                          backgroundColor: `${primaryColor}22`,
+                          border: `2px solid ${primaryColor}`,
+                          color: primaryColor,
+                          textShadow: `0 0 10px ${primaryColor}`,
+                        }}
+                      >
+                        {terminology.continueNextCircuit}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowCircuitCompleted(false)}
+                      className="px-4 py-2 rounded text-sm opacity-60 hover:opacity-100 transition-opacity"
+                      style={{ border: `1px solid ${primaryColor}66`, color: primaryColor }}
+                    >
+                      CONTINUE EXPLORING
+                    </button>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Audit View Modal */}
       {showAuditView && (
         <AuditView
@@ -1220,6 +1430,18 @@ export function ImmersiveView({
           }}
           variant="IMMERSIVE"
           theme={{ primaryColor, secondaryColor, textColor, bgColor }}
+        />
+      )}
+
+      {/* Network Map Modal */}
+      {showNetworkMap && currentCircuit && (
+        <NetworkMapModal
+          circuit={currentCircuit}
+          runState={displayState}
+          theme={{ primaryColor, secondaryColor, textColor, background: bgColor }}
+          semanticColors={semanticColors}
+          terminology={terminology}
+          onClose={() => setShowNetworkMap(false)}
         />
       )}
 

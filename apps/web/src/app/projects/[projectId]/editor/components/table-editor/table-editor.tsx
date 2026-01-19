@@ -36,14 +36,18 @@ export function TableEditor({
     description: string
     level: number
     cd: number
-    failMode: FailMode
+    criticalFailMode: FailMode
+    rangeFailMode: FailMode
+    rangeErrorMessage: string
     visibleByDefault: boolean
   }>({
     name: '',
     description: '',
     level: 0,
-    cd: 1,
-    failMode: 'WARNING',
+    cd: 11,  // Default, min is 4 (must be > 3)
+    criticalFailMode: 'BLOQUEO',
+    rangeFailMode: 'WARNING',
+    rangeErrorMessage: '',
     visibleByDefault: true,
   })
 
@@ -77,8 +81,10 @@ export function TableEditor({
       name: '',
       description: '',
       level: 0,
-      cd: 1,
-      failMode: 'WARNING',
+      cd: 11,
+      criticalFailMode: 'BLOQUEO',
+      rangeFailMode: 'WARNING',
+      rangeErrorMessage: '',
       visibleByDefault: true,
     })
   }
@@ -158,11 +164,12 @@ export function TableEditor({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-800 text-left text-gray-400">
-                    <th className="py-2 px-2">ID</th>
                     <th className="py-2 px-2">Nombre</th>
                     <th className="py-2 px-2">Level</th>
                     <th className="py-2 px-2">CD</th>
-                    <th className="py-2 px-2">Fail Mode</th>
+                    <th className="py-2 px-2 text-red-400" title="Rolls 1-2">Crítico</th>
+                    <th className="py-2 px-2 text-yellow-400" title="Rolls 3 a CD-1">Rango</th>
+                    <th className="py-2 px-2 text-yellow-400">Mensaje Error</th>
                     <th className="py-2 px-2">Visible</th>
                     <th className="py-2 px-2"></th>
                   </tr>
@@ -170,7 +177,6 @@ export function TableEditor({
                 <tbody>
                   {currentCircuit.nodes.map((node) => (
                     <tr key={node.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-2 px-2 font-mono text-xs text-gray-400">{node.id}</td>
                       <td className="py-2 px-2">
                         <input
                           type="text"
@@ -197,23 +203,41 @@ export function TableEditor({
                           type="number"
                           value={node.cd}
                           onChange={(e) => {
-                            const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                            const val = Math.max(3, parseInt(e.target.value) || 3)
                             onUpdateNode(selectedCircuitId, node.id, { cd: val })
                           }}
                           className="w-16 bg-transparent border-b border-transparent hover:border-gray-600 focus:border-cyber-primary focus:outline-none px-1 py-0.5 text-center"
-                          min={1}
-                          max={20}
+                          min={3}
                         />
                       </td>
                       <td className="py-2 px-2">
                         <select
-                          value={node.failMode}
-                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { failMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
-                          className="bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-xs"
+                          value={node.criticalFailMode}
+                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { criticalFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                          className="bg-cyber-darker border border-red-900 rounded px-2 py-1 text-xs"
                         >
                           <option value="WARNING">WARNING</option>
                           <option value="BLOQUEO">BLOQUEO</option>
                         </select>
+                      </td>
+                      <td className="py-2 px-2">
+                        <select
+                          value={node.rangeFailMode}
+                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                          className="bg-cyber-darker border border-yellow-900 rounded px-2 py-1 text-xs"
+                        >
+                          <option value="WARNING">WARNING</option>
+                          <option value="BLOQUEO">BLOQUEO</option>
+                        </select>
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={node.rangeErrorMessage || ''}
+                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { rangeErrorMessage: e.target.value })}
+                          placeholder="(warning genérico)"
+                          className="w-full bg-transparent border-b border-transparent hover:border-yellow-600 focus:border-yellow-400 focus:outline-none px-1 py-0.5 text-yellow-400 placeholder:text-gray-600"
+                        />
                       </td>
                       <td className="py-2 px-2 text-center">
                         <input
@@ -235,9 +259,6 @@ export function TableEditor({
                   ))}
                   {/* Add new node row */}
                   <tr className="bg-gray-800/30">
-                    <td className="py-2 px-2">
-                      <span className="text-xs text-gray-500 italic">Auto</span>
-                    </td>
                     <td className="py-2 px-2">
                       <input
                         type="text"
@@ -265,23 +286,41 @@ export function TableEditor({
                         type="number"
                         value={newNode.cd}
                         onChange={(e) => {
-                          const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                          const val = Math.max(3, parseInt(e.target.value) || 3)
                           setNewNode({ ...newNode, cd: val })
                         }}
                         className="w-16 bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-sm text-center"
-                        min={1}
-                        max={20}
+                        min={3}
                       />
                     </td>
                     <td className="py-2 px-2">
                       <select
-                        value={newNode.failMode}
-                        onChange={(e) => setNewNode({ ...newNode, failMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
-                        className="bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-xs"
+                        value={newNode.criticalFailMode}
+                        onChange={(e) => setNewNode({ ...newNode, criticalFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                        className="bg-cyber-darker border border-red-900 rounded px-2 py-1 text-xs"
                       >
                         <option value="WARNING">WARNING</option>
                         <option value="BLOQUEO">BLOQUEO</option>
                       </select>
+                    </td>
+                    <td className="py-2 px-2">
+                      <select
+                        value={newNode.rangeFailMode}
+                        onChange={(e) => setNewNode({ ...newNode, rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
+                        className="bg-cyber-darker border border-yellow-900 rounded px-2 py-1 text-xs"
+                      >
+                        <option value="WARNING">WARNING</option>
+                        <option value="BLOQUEO">BLOQUEO</option>
+                      </select>
+                    </td>
+                    <td className="py-2 px-2">
+                      <input
+                        type="text"
+                        value={newNode.rangeErrorMessage}
+                        onChange={(e) => setNewNode({ ...newNode, rangeErrorMessage: e.target.value })}
+                        placeholder="(warning genérico)"
+                        className="w-full bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-sm text-yellow-400 placeholder:text-gray-600"
+                      />
                     </td>
                     <td className="py-2 px-2 text-center">
                       <input

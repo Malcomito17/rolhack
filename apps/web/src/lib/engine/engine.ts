@@ -172,9 +172,25 @@ function addTimelineEvent(state: RunState, event: TimelineEvent): RunState {
 }
 
 /**
- * Check if a circuit is completed (all nodes hacked)
+ * Check if a circuit is completed
+ * A circuit is complete when:
+ * - The final node is hacked (if one exists), OR
+ * - All nodes are hacked (if no final node)
+ * Also checks if circuit is already marked as completed
  */
 function isCircuitCompleted(state: RunState, circuit: CircuitDefinition): boolean {
+  // Already marked as completed
+  if (state.completedCircuits?.[circuit.id] === true) return true
+
+  // Check if there's a final node
+  const finalNode = circuit.nodes.find(n => n.isFinal === true)
+
+  if (finalNode) {
+    // If there's a final node, circuit is complete when it's hacked
+    return state.nodes[finalNode.id]?.hackeado === true
+  }
+
+  // If no final node, all nodes must be hacked
   return circuit.nodes.every((node) => state.nodes[node.id]?.hackeado === true)
 }
 
@@ -245,6 +261,7 @@ export function initializeRunState(data: ProjectData): RunState {
     warnings: [],
     timeline: [],
     blockedCircuits: {},
+    completedCircuits: {},
   }
 
   // Add RUN_START event to timeline
@@ -404,8 +421,32 @@ export function attemptHack(
 
   const timestamp = new Date().toISOString()
 
-  // RULE 1: Roll < 3 = CRITICAL FAILURE - Always blocked (CIRCUIT LOCKDOWN)
+  // RULE 1: Roll < 3 (1-2) = CRITICAL FAILURE - Use criticalFailMode
   if (roll < 3) {
+    // Check criticalFailMode - if WARNING, allow retry
+    if (node.criticalFailMode === 'WARNING') {
+      newNodeState.ultimoResultado = 'fallo'
+      const warning: Warning = {
+        severity: 'ALERT',
+        nodeId,
+        message: `CRITICAL TRACE — BLACK ICE DETECTED — ${node.name}`,
+        timestamp,
+      }
+      newState.warnings.push(warning)
+
+      return {
+        newState,
+        result: {
+          success: false,
+          hackeado: false,
+          bloqueado: false,
+          warning,
+          message: 'CRITICAL TRACE — BLACK ICE ACTIVE — RETRY POSSIBLE',
+        },
+      }
+    }
+
+    // BLOQUEO mode - Block node + circuit
     newNodeState.bloqueado = true
     newNodeState.ultimoResultado = 'fallo'
 
@@ -480,8 +521,17 @@ export function attemptHack(
     )
     newState.timeline = [...newState.timeline, hackEvent]
 
-    // Check for circuit completion
-    if (isCircuitCompleted(newState, circuit)) {
+    // Check if this was the final node (circuit complete)
+    const isFinalNode = node.isFinal === true
+    let circuitJustCompleted = false
+
+    // Check for circuit completion (final node hacked or all nodes hacked)
+    if (isCircuitCompleted(newState, circuit) && !newState.completedCircuits?.[circuit.id]) {
+      // Mark circuit as completed
+      if (!newState.completedCircuits) newState.completedCircuits = {}
+      newState.completedCircuits[circuit.id] = true
+      circuitJustCompleted = true
+
       const circuitCompleteEvent = createTimelineEvent(
         'CIRCUIT_COMPLETED',
         newState,
@@ -508,20 +558,25 @@ export function attemptHack(
         success: true,
         hackeado: true,
         bloqueado: false,
-        message: 'ACCESS GRANTED — SECURITY HANDSHAKE ACCEPTED',
+        circuitCompleted: circuitJustCompleted,
+        message: isFinalNode && circuitJustCompleted
+          ? 'FINAL NODE COMPROMISED — CIRCUIT COMPLETE'
+          : 'ACCESS GRANTED — SECURITY HANDSHAKE ACCEPTED',
       },
     }
   }
 
-  // RULE 3: 3 <= roll < CD = Depends on failMode
+  // RULE 3: 3 <= roll < CD = Depends on rangeFailMode
   newNodeState.ultimoResultado = 'fallo'
   let warning: Warning
 
-  if (node.failMode === 'WARNING') {
+  if (node.rangeFailMode === 'WARNING') {
+    // Use custom rangeErrorMessage if provided, otherwise default
+    const message = node.rangeErrorMessage || `TRACE DETECTED — ${node.name}`
     warning = {
       severity: 'TRACE',
       nodeId,
-      message: `TRACE DETECTED — ${node.name}`,
+      message,
       timestamp,
     }
     newState.warnings.push(warning)
@@ -697,9 +752,10 @@ export function discoverHiddenLinks(
 /**
  * Move to a node
  *
- * RULES (PROMPT 7/8):
- * - Rule A (Fast-travel): Can ALWAYS move to any already-hacked node in the circuit
- * - Rule B (Advance): To move to a non-hacked node via link, current node must be hacked first
+ * RULES (Direct Link Movement):
+ * - Only movement to nodes connected by direct link (no free fast-travel)
+ * - Hacked adjacent node: allow movement (retreat)
+ * - Non-hacked adjacent node: requires current node hacked (advance) + target discovered
  * - Level does NOT determine movement — only links and hack state matter
  */
 export function moveToNode(
@@ -794,41 +850,7 @@ export function moveToNode(
     }
   }
 
-  // RULE A: Fast-travel to already-hacked nodes (always allowed)
-  if (targetNodeState.hackeado) {
-    const newState = structuredClone(state)
-    newState.position = {
-      circuitId,
-      nodeId: targetNodeId,
-    }
-
-    return {
-      newState,
-      result: {
-        success: true,
-        newPosition: newState.position,
-        message: `RECONNECTING TO ${targetNode.name.toUpperCase()}...`,
-      },
-    }
-  }
-
-  // RULE B: Move to non-hacked node requires:
-  // 1. Current node must be hacked
-  // 2. Must have a valid link connection
-
-  const currentNodeState = state.nodes[currentNodeId]
-  if (!currentNodeState?.hackeado) {
-    return {
-      newState: state,
-      result: {
-        success: false,
-        newPosition: state.position,
-        message: 'CURRENT NODE NOT COMPROMISED — CANNOT TRAVERSE',
-      },
-    }
-  }
-
-  // Find a link between current and target node
+  // STEP 1: Find a link between current and target node (REQUIRED for all movement)
   const connectingLink = circuit.links.find((link) =>
     linkConnectsNodes(link, currentNodeId, targetNodeId)
   )
@@ -846,7 +868,7 @@ export function moveToNode(
 
   const linkState = state.links[connectingLink.id]
 
-  // Check link is discovered
+  // STEP 2: Link must be discovered
   if (!linkState || !linkState.descubierto) {
     return {
       newState: state,
@@ -870,7 +892,38 @@ export function moveToNode(
     }
   }
 
-  // Check target is discovered
+  // STEP 3: If target is hacked → allow movement (retreat)
+  if (targetNodeState.hackeado) {
+    const newState = structuredClone(state)
+    newState.position = {
+      circuitId,
+      nodeId: targetNodeId,
+    }
+
+    return {
+      newState,
+      result: {
+        success: true,
+        newPosition: newState.position,
+        message: `RECONNECTING TO ${targetNode.name.toUpperCase()}...`,
+      },
+    }
+  }
+
+  // STEP 4: Target is NOT hacked → requires current node hacked (advance)
+  const currentNodeState = state.nodes[currentNodeId]
+  if (!currentNodeState?.hackeado) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        newPosition: state.position,
+        message: 'CURRENT NODE NOT COMPROMISED — CANNOT TRAVERSE',
+      },
+    }
+  }
+
+  // STEP 5: Target must be discovered
   if (!targetNodeState.descubierto) {
     return {
       newState: state,
@@ -902,13 +955,14 @@ export function moveToNode(
 /**
  * Get available moves from current position
  *
- * RULES (PROMPT 7):
- * - All hacked nodes are available (fast-travel)
- * - If current node is hacked, linked non-hacked nodes are also available
+ * RULES (Direct Link Movement):
+ * - Only adjacent nodes connected by discovered links
+ * - retreat: hacked adjacent nodes (can move back without current being hacked)
+ * - advance: non-hacked adjacent nodes (requires current node hacked + target discovered)
  *
  * Returns object with:
- * - fastTravel: nodes that can be fast-traveled to (already hacked)
- * - advance: nodes that can be advanced to (connected via link, current is hacked)
+ * - fastTravel: hacked adjacent nodes (retreat targets)
+ * - advance: non-hacked adjacent nodes (advance targets, requires current hacked)
  * - all: combined list of all available moves
  */
 export function getAvailableMoves(
@@ -920,57 +974,43 @@ export function getAvailableMoves(
 
   if (!circuit) return { fastTravel: [], advance: [], all: [] }
 
-  const fastTravel: string[] = []
-  const advance: string[] = []
+  const fastTravel: string[] = [] // Hacked adjacent nodes (retreat)
+  const advance: string[] = [] // Non-hacked adjacent nodes (advance)
 
   const currentNodeState = state.nodes[currentNodeId]
   const currentIsHacked = currentNodeState?.hackeado === true
 
-  // Collect all hacked nodes (fast-travel targets)
-  for (const node of circuit.nodes) {
-    if (node.id === currentNodeId) continue // Can't move to current
+  // Get all links from current node
+  const linksFromNode = getLinksFromNode(circuit, currentNodeId)
 
-    const nodeState = state.nodes[node.id]
-    if (!nodeState) continue
-    if (nodeState.inaccesible || nodeState.bloqueado) continue
+  for (const link of linksFromNode) {
+    const linkState = state.links[link.id]
 
-    if (nodeState.hackeado) {
-      fastTravel.push(node.id)
+    // Link must be discovered and not blocked
+    if (!linkState || !linkState.descubierto || linkState.inaccesible) {
+      continue
     }
-  }
 
-  // If current node is hacked, collect linked non-hacked nodes (advance targets)
-  if (currentIsHacked) {
-    const linksFromNode = getLinksFromNode(circuit, currentNodeId)
+    const targetNodeId = getLinkTarget(link, currentNodeId)
+    const targetNodeState = state.nodes[targetNodeId]
 
-    for (const link of linksFromNode) {
-      const linkState = state.links[link.id]
+    if (!targetNodeState) continue
+    if (targetNodeState.inaccesible || targetNodeState.bloqueado) continue
 
-      // Link must be discovered and not blocked
-      if (!linkState || !linkState.descubierto || linkState.inaccesible) {
-        continue
+    if (targetNodeState.hackeado) {
+      // Hacked adjacent node → retreat allowed (no restriction)
+      if (!fastTravel.includes(targetNodeId)) {
+        fastTravel.push(targetNodeId)
       }
-
-      const targetNodeId = getLinkTarget(link, currentNodeId)
-      const targetNodeState = state.nodes[targetNodeId]
-
-      // Target must be discovered, not blocked, not inaccessible, and not already hacked
-      if (
-        targetNodeState &&
-        targetNodeState.descubierto &&
-        !targetNodeState.inaccesible &&
-        !targetNodeState.bloqueado &&
-        !targetNodeState.hackeado
-      ) {
-        // Avoid duplicates
-        if (!advance.includes(targetNodeId)) {
-          advance.push(targetNodeId)
-        }
+    } else if (currentIsHacked && targetNodeState.descubierto) {
+      // Non-hacked adjacent node → advance allowed if current is hacked + target discovered
+      if (!advance.includes(targetNodeId)) {
+        advance.push(targetNodeId)
       }
     }
   }
 
-  // Combine both lists (no duplicates since hacked nodes are in fastTravel, non-hacked in advance)
+  // Combine both lists
   const all = [...fastTravel, ...advance]
 
   return { fastTravel, advance, all }

@@ -43,6 +43,8 @@ export interface ThemeTerminology {
   // Result messages
   hackSuccess: string      // Success message when hacking
   hackFailed: string       // Failure message when hacking
+  traceDetected: string    // Warning trace detected (custom message displayed)
+  retryAvailable: string   // "Retry available" message after warning
   scanSuccess: string      // Success message when scanning
   scanEmpty: string        // No hidden links found
   moveSuccess: string      // Success message when moving
@@ -70,6 +72,15 @@ export interface ThemeTerminology {
   gameOverSubtitle: string // Subtitle under GAME OVER
   gameOverMessages: string[] // Terminal messages for game over
   disconnect: string       // "DISCONNECT" button text
+
+  // Circuit Completed modal (success - final node hacked)
+  circuitCompleted: string      // "CIRCUIT COMPLETE" / "NIVEL CONQUISTADO" / "DIMENSION CORROMPIDA"
+  circuitCompletedIcon: string  // "✓" / "🏆" / "👁️"
+  circuitCompletedSubtitle: string // Subtitle under circuit completed
+  circuitCompletedMessages: string[] // Terminal messages for completion
+  continueNextCircuit: string   // "CONTINUE TO NEXT CIRCUIT" button text
+  allCircuitsCompleted: string  // Message when all circuits are done
+  finalNode: string             // "FINAL" / "OBJETIVO" / "NEXO PRIMORDIAL"
 
   // Boot sequence messages (array of messages for startup animation)
   bootMessages: string[]
@@ -201,6 +212,8 @@ export const DEFAULT_TERMINOLOGY: ThemeTerminology = {
   secure: 'SEGURO',
   hackSuccess: 'NODO COMPROMETIDO',
   hackFailed: 'ACCESO DENEGADO',
+  traceDetected: 'TRACE DETECTADO',
+  retryAvailable: 'REINTENTO DISPONIBLE — SISTEMA AUN ACCESIBLE',
   scanSuccess: 'RUTAS DESCUBIERTAS',
   scanEmpty: 'NO SE ENCONTRARON RUTAS OCULTAS',
   moveSuccess: 'POSICION ACTUALIZADA',
@@ -230,6 +243,18 @@ export const DEFAULT_TERMINOLOGY: ThemeTerminology = {
     'RUN STATUS: FAILED',
   ],
   disconnect: 'DISCONNECT',
+  circuitCompleted: 'CIRCUIT COMPLETE',
+  circuitCompletedIcon: '✓',
+  circuitCompletedSubtitle: 'SYSTEM FULLY COMPROMISED',
+  circuitCompletedMessages: [
+    'ALL DEFENSES NEUTRALIZED',
+    'DATA EXTRACTION COMPLETE',
+    'BACKDOOR INSTALLED SUCCESSFULLY',
+    'MISSION OBJECTIVE ACHIEVED',
+  ],
+  continueNextCircuit: 'CONTINUE TO NEXT CIRCUIT',
+  allCircuitsCompleted: 'ALL SYSTEMS COMPROMISED - RUN COMPLETE',
+  finalNode: 'FINAL',
   bootMessages: [
     '> INITIALIZING NEURAL INTERFACE...',
     '> ESTABLISHING SECURE CONNECTION...',
@@ -255,6 +280,8 @@ export const MEDIEVAL_TERMINOLOGY: ThemeTerminology = {
   secure: 'PROTEGIDA',
   hackSuccess: 'Runa descifrada. La camara se abre...',
   hackFailed: 'Los glifos rechazan tu intento.',
+  traceDetected: 'Los guardianes se alertan',
+  retryAvailable: 'Aun puedes intentarlo de nuevo...',
   scanSuccess: 'Has encontrado pasadizos ocultos.',
   scanEmpty: 'No hay pasadizos secretos aqui.',
   moveSuccess: 'Avanzas por el pasadizo...',
@@ -284,6 +311,18 @@ export const MEDIEVAL_TERMINOLOGY: ThemeTerminology = {
     'La mazmorra reclama otra victima',
   ],
   disconnect: 'ABANDONAR',
+  circuitCompleted: 'NIVEL CONQUISTADO',
+  circuitCompletedIcon: '🏆',
+  circuitCompletedSubtitle: 'LA MAZMORRA HA CAIDO',
+  circuitCompletedMessages: [
+    'Has derrotado a los guardianes',
+    'El tesoro es tuyo',
+    'Las runas se desvanecen',
+    'La victoria es dulce...',
+  ],
+  continueNextCircuit: 'CONTINUAR AL SIGUIENTE NIVEL',
+  allCircuitsCompleted: 'TODAS LAS MAZMORRAS CONQUISTADAS',
+  finalNode: 'OBJETIVO',
   bootMessages: [
     '> Encendiendo antorcha...',
     '> Estudiando el pergamino...',
@@ -309,6 +348,8 @@ export const CTHULHU_TERMINOLOGY: ThemeTerminology = {
   secure: 'DORMIDO',
   hackSuccess: 'Los Antiguos responden... el velo se rasga.',
   hackFailed: 'Tu mente tiembla ante lo incomprensible.',
+  traceDetected: 'Algo te ha percibido en las sombras...',
+  retryAvailable: 'La locura aun no te consume... intenta de nuevo.',
   scanSuccess: 'Percibes portales entre las sombras...',
   scanEmpty: 'Las tinieblas no revelan nada... por ahora.',
   moveSuccess: 'Te deslizas entre dimensiones...',
@@ -338,6 +379,18 @@ export const CTHULHU_TERMINOLOGY: ThemeTerminology = {
     'Ph\'nglui mglw\'nafh...',
   ],
   disconnect: 'DESPERTAR',
+  circuitCompleted: 'DIMENSION CORROMPIDA',
+  circuitCompletedIcon: '👁️',
+  circuitCompletedSubtitle: 'LOS ANTIGUOS TE RECONOCEN',
+  circuitCompletedMessages: [
+    'El velo se ha rasgado por completo',
+    'Los susurros ahora te obedecen',
+    'Tu mente se ha expandido',
+    'Iä! Iä! La dimension es tuya...',
+  ],
+  continueNextCircuit: 'INVOCAR OTRA DIMENSION',
+  allCircuitsCompleted: 'TODAS LAS DIMENSIONES CORROMPIDAS',
+  finalNode: 'NEXO PRIMORDIAL',
   bootMessages: [
     '> Despertando consciencia primigenia...',
     '> Ph\'nglui mglw\'nafh Cthulhu...',

@@ -13,15 +13,44 @@ export const FailModeSchema = z.enum(['WARNING', 'BLOQUEO'])
 
 export const LinkStyleSchema = z.enum(['solid', 'dashed', 'dotted'])
 
-export const NodeDefinitionSchema = z.object({
+// Raw schema before migration (accepts both old and new format)
+const NodeDefinitionRawSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
   level: z.number().int().min(0),
   cd: z.number().int().min(0), // 0 allowed for entry nodes
-  failMode: FailModeSchema,
+  // Legacy field for backward compatibility
+  failMode: FailModeSchema.optional(),
+  // New fields for expanded failMode system
+  criticalFailMode: FailModeSchema.optional(),
+  rangeFailMode: FailModeSchema.optional(),
+  rangeErrorMessage: z.string().optional(),
   visibleByDefault: z.boolean(),
+  // Final node - hacking completes the circuit (only 1 per circuit)
+  isFinal: z.boolean().optional(),
+  // Map positioning (optional, for visual circuit map)
+  mapX: z.number().min(0).max(100).optional(),
+  mapY: z.number().min(0).max(100).optional(),
 })
+
+// Schema with migration transform for backward compatibility
+export const NodeDefinitionSchema = NodeDefinitionRawSchema.transform((node) => ({
+  id: node.id,
+  name: node.name,
+  description: node.description,
+  level: node.level,
+  cd: node.cd,
+  // Migration: use new fields if present, otherwise fall back to legacy failMode
+  criticalFailMode: node.criticalFailMode ?? node.failMode ?? 'BLOQUEO',
+  rangeFailMode: node.rangeFailMode ?? node.failMode ?? 'WARNING',
+  rangeErrorMessage: node.rangeErrorMessage,
+  visibleByDefault: node.visibleByDefault,
+  isFinal: node.isFinal ?? false,
+  // Map positioning
+  mapX: node.mapX,
+  mapY: node.mapY,
+}))
 
 export const LinkDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -38,7 +67,13 @@ export const CircuitDefinitionSchema = z.object({
   description: z.string().optional(),
   nodes: z.array(NodeDefinitionSchema).min(1),
   links: z.array(LinkDefinitionSchema),
-})
+}).refine(
+  (circuit) => {
+    const finalNodes = circuit.nodes.filter(n => n.isFinal === true)
+    return finalNodes.length <= 1
+  },
+  { message: 'Solo puede haber un nodo final por circuito' }
+)
 
 export const ProjectMetaSchema = z.object({
   version: z.string().min(1),
