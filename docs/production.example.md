@@ -30,7 +30,7 @@ Raspberry Pi
 |---------|------|
 | Codigo fuente | `/mnt/ssd/projects/rolhack` |
 | Base de datos | Volumen Docker `rolhack-data` |
-| nginx config | `/home/malcomito/projects/EuforiaEvents/docker/nginx/conf.d/rolhack.conf` |
+| nginx config | `<YOUR_NGINX_CONFIG_PATH>/rolhack.conf` |
 | Cloudflare tunnel | Servicio systemd `cloudflared` |
 
 ## Setup Inicial
@@ -38,9 +38,9 @@ Raspberry Pi
 ### 1. Clonar repositorio
 
 ```bash
-ssh malcomito@100.119.40.15
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP>
 cd /mnt/ssd/projects
-git clone https://github.com/Malcomito17/rolhack.git
+git clone https://github.com/<YOUR_GITHUB_USER>/rolhack.git
 cd rolhack
 ```
 
@@ -57,15 +57,15 @@ Variables requeridas:
 # Autenticacion
 AUTH_SECRET="<openssl rand -base64 32>"
 AUTH_TRUST_HOST=true
-AUTH_URL="https://rolhack.euforiateclog.cloud"
-NEXT_PUBLIC_APP_URL="https://rolhack.euforiateclog.cloud"
+AUTH_URL="https://<YOUR_DOMAIN>"
+NEXT_PUBLIC_APP_URL="https://<YOUR_DOMAIN>"
 
 # Google OAuth
 GOOGLE_CLIENT_ID="<desde Google Cloud Console>"
 GOOGLE_CLIENT_SECRET="<desde Google Cloud Console>"
 
 # RBAC
-SUPERADMIN_EMAILS="euforiateclog@gmail.com"
+SUPERADMIN_EMAILS="<YOUR_ADMIN_EMAIL>"
 
 # Demo (opcional)
 SEED_DEMO=true
@@ -77,7 +77,7 @@ SEED_DEMO=true
 2. Crear credenciales OAuth 2.0
 3. Agregar URI de redireccion autorizado:
    ```
-   https://rolhack.euforiateclog.cloud/api/auth/callback/google
+   https://<YOUR_DOMAIN>/api/auth/callback/google
    ```
 4. Copiar Client ID y Client Secret a `.env.production`
 
@@ -127,7 +127,7 @@ SEED_DEMO=true
 ./scripts/deploy-to-pi.sh --env --build
 
 # Ver credenciales actuales en el servidor:
-ssh malcomito@100.119.40.15 "cat /mnt/ssd/projects/rolhack/.env.production"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "cat /mnt/ssd/projects/rolhack/.env.production"
 ```
 
 **Archivos de credenciales:**
@@ -138,32 +138,32 @@ ssh malcomito@100.119.40.15 "cat /mnt/ssd/projects/rolhack/.env.production"
 
 ```bash
 # Ver logs en tiempo real
-ssh malcomito@100.119.40.15 "docker logs rolhack -f"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack -f"
 
 # Ultimos 200 logs
-ssh malcomito@100.119.40.15 "docker logs rolhack --tail 200"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack --tail 200"
 
 # Logs con timestamps
-ssh malcomito@100.119.40.15 "docker logs rolhack --timestamps"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack --timestamps"
 ```
 
 ### Estado del servicio
 
 ```bash
 # Estado del container
-ssh malcomito@100.119.40.15 "docker ps -f name=rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker ps -f name=rolhack"
 
 # Healthcheck
-curl https://rolhack.euforiateclog.cloud/api/health
+curl https://<YOUR_DOMAIN>/api/health
 
 # Inspeccion detallada
-ssh malcomito@100.119.40.15 "docker inspect rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker inspect rolhack"
 ```
 
 ### Reiniciar servicio
 
 ```bash
-ssh malcomito@100.119.40.15 "cd /mnt/ssd/projects/rolhack && docker compose restart"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "cd /mnt/ssd/projects/rolhack && docker compose restart"
 ```
 
 ## Base de Datos
@@ -174,17 +174,17 @@ La base de datos SQLite esta en un volumen Docker persistente:
 
 ```bash
 # Ver volumenes
-ssh malcomito@100.119.40.15 "docker volume ls | grep rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker volume ls | grep rolhack"
 
 # Ubicacion fisica
-ssh malcomito@100.119.40.15 "docker volume inspect rolhack-data"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker volume inspect rolhack-data"
 ```
 
 ### Backup Manual
 
 ```bash
 # 1. Conectar a la Pi
-ssh malcomito@100.119.40.15
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP>
 
 # 2. Crear directorio de backups
 mkdir -p /mnt/ssd/backups/rolhack
@@ -226,13 +226,13 @@ crontab -e
 
 ```bash
 # 1. Detener container
-ssh malcomito@100.119.40.15 "docker stop rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker stop rolhack"
 
 # 2. Copiar backup al volumen
-ssh malcomito@100.119.40.15 "docker cp /mnt/ssd/backups/rolhack/rolhack-YYYYMMDD-HHMMSS.db rolhack:/app/data/rolhack.db"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker cp /mnt/ssd/backups/rolhack/rolhack-YYYYMMDD-HHMMSS.db rolhack:/app/data/rolhack.db"
 
 # 3. Iniciar container
-ssh malcomito@100.119.40.15 "docker start rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker start rolhack"
 ```
 
 ### Migraciones
@@ -242,40 +242,40 @@ Las migraciones se ejecutan automaticamente al iniciar el container.
 Para verificar estado de migraciones:
 
 ```bash
-ssh malcomito@100.119.40.15 "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
 ```
 
 ## Cloudflare Tunnel
 
 ### Configuracion actual
 
-- Tunnel ID: `e10668a1-d7f8-4496-bfd3-8545ebf06cc0`
-- Hostname: `rolhack.euforiateclog.cloud`
+- Tunnel ID: `<YOUR_TUNNEL_ID>`
+- Hostname: `<YOUR_DOMAIN>`
 - Servicio: `http://localhost:3002`
 
 ### Verificar estado
 
 ```bash
-ssh malcomito@100.119.40.15 "sudo systemctl status cloudflared"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "sudo systemctl status cloudflared"
 ```
 
 ### Config file
 
 ```bash
 # Ver configuracion
-ssh malcomito@100.119.40.15 "cat ~/.cloudflared/config.yml"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "cat ~/.cloudflared/config.yml"
 ```
 
 ## nginx
 
 ### Configuracion
 
-Archivo: `/home/malcomito/projects/EuforiaEvents/docker/nginx/conf.d/rolhack.conf`
+Archivo: `<YOUR_NGINX_CONFIG_PATH>/rolhack.conf`
 
 ```nginx
 server {
     listen 80;
-    server_name rolhack.euforiateclog.cloud;
+    server_name <YOUR_DOMAIN>;
 
     location / {
         proxy_pass http://host.docker.internal:3002;
@@ -294,7 +294,7 @@ server {
 ### Reiniciar nginx
 
 ```bash
-ssh malcomito@100.119.40.15 "cd ~/projects/EuforiaEvents && docker compose restart nginx"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "cd ~/projects/EuforiaEvents && docker compose restart nginx"
 ```
 
 ## Rollback
@@ -303,7 +303,6 @@ ssh malcomito@100.119.40.15 "cd ~/projects/EuforiaEvents && docker compose resta
 
 ```bash
 # 1. Ver historial de commits
-cd /Users/malcomito/Projects/Rolhack
 git log --oneline -10
 
 # 2. Hacer checkout al commit deseado
@@ -323,10 +322,10 @@ Ver seccion "Restaurar Backup" arriba.
 
 ```bash
 # Ver logs de inicio
-ssh malcomito@100.119.40.15 "docker logs rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack"
 
 # Verificar variables de entorno
-ssh malcomito@100.119.40.15 "docker exec rolhack env | grep -E 'AUTH|DATABASE|GOOGLE'"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker exec rolhack env | grep -E 'AUTH|DATABASE|GOOGLE'"
 ```
 
 ### Error 502 Bad Gateway
@@ -339,15 +338,15 @@ ssh malcomito@100.119.40.15 "docker exec rolhack env | grep -E 'AUTH|DATABASE|GO
 
 ```bash
 # Ver estado de migraciones
-ssh malcomito@100.119.40.15 "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
 
 # Forzar migracion
-ssh malcomito@100.119.40.15 "docker exec rolhack npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker exec rolhack npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma"
 ```
 
 ### Healthcheck fallando
 
 ```bash
 # Verificar endpoint directamente
-ssh malcomito@100.119.40.15 "curl -v http://localhost:3002/api/health"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "curl -v http://localhost:3002/api/health"
 ```

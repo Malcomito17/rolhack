@@ -8,7 +8,7 @@ Checklist para verificar que RolHack esta listo para produccion.
 - [ ] Docker instalado en la Pi
 - [ ] Cloudflare Tunnel configurado
 - [ ] nginx configurado como reverse proxy
-- [ ] Dominio `rolhack.euforiateclog.cloud` apuntando al tunnel
+- [ ] Dominio `<YOUR_DOMAIN>` apuntando al tunnel
 
 ## Google OAuth
 
@@ -17,7 +17,7 @@ Checklist para verificar que RolHack esta listo para produccion.
 - [ ] Credenciales OAuth 2.0 creadas
 - [ ] URI de redireccion configurado:
   ```
-  https://rolhack.euforiateclog.cloud/api/auth/callback/google
+  https://<YOUR_DOMAIN>/api/auth/callback/google
   ```
 - [ ] Client ID copiado a `.env.production`
 - [ ] Client Secret copiado a `.env.production`
@@ -28,11 +28,11 @@ Verificar en `.env.production`:
 
 - [ ] `AUTH_SECRET` - Generado con `openssl rand -base64 32`
 - [ ] `AUTH_TRUST_HOST=true`
-- [ ] `AUTH_URL=https://rolhack.euforiateclog.cloud`
-- [ ] `NEXT_PUBLIC_APP_URL=https://rolhack.euforiateclog.cloud`
+- [ ] `AUTH_URL=https://<YOUR_DOMAIN>`
+- [ ] `NEXT_PUBLIC_APP_URL=https://<YOUR_DOMAIN>`
 - [ ] `GOOGLE_CLIENT_ID` - Configurado
 - [ ] `GOOGLE_CLIENT_SECRET` - Configurado
-- [ ] `SUPERADMIN_EMAILS=euforiateclog@gmail.com`
+- [ ] `SUPERADMIN_EMAILS=<YOUR_ADMIN_EMAIL>`
 
 ## Deploy
 
@@ -46,7 +46,7 @@ Verificar en `.env.production`:
 ### Healthcheck
 
 ```bash
-curl https://rolhack.euforiateclog.cloud/api/health
+curl https://<YOUR_DOMAIN>/api/health
 # Debe responder: {"status":"ok"}
 ```
 - [ ] Healthcheck responde OK
@@ -54,7 +54,7 @@ curl https://rolhack.euforiateclog.cloud/api/health
 ### Container
 
 ```bash
-ssh malcomito@100.119.40.15 "docker ps -f name=rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker ps -f name=rolhack"
 ```
 - [ ] Container `rolhack` esta `running`
 - [ ] Container esta `healthy`
@@ -62,16 +62,16 @@ ssh malcomito@100.119.40.15 "docker ps -f name=rolhack"
 ### Logs
 
 ```bash
-ssh malcomito@100.119.40.15 "docker logs rolhack --tail 20"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack --tail 20"
 ```
 - [ ] No hay errores en los logs
 - [ ] Migraciones ejecutadas correctamente
 
 ### Autenticacion
 
-1. Abrir https://rolhack.euforiateclog.cloud
+1. Abrir https://<YOUR_DOMAIN>
 2. Click "Sign in with Google"
-3. Autenticar con `euforiateclog@gmail.com`
+3. Autenticar con `<YOUR_ADMIN_EMAIL>`
 
 - [ ] Login funciona correctamente
 - [ ] Usuario tiene rol SUPERADMIN
@@ -118,19 +118,19 @@ ssh malcomito@100.119.40.15 "docker logs rolhack --tail 20"
 
 ```bash
 # Estado del servicio
-ssh malcomito@100.119.40.15 "docker ps -f name=rolhack"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker ps -f name=rolhack"
 
 # Logs en tiempo real
-ssh malcomito@100.119.40.15 "docker logs rolhack -f"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker logs rolhack -f"
 
 # Reiniciar servicio
-ssh malcomito@100.119.40.15 "cd /mnt/ssd/projects/rolhack && docker compose restart"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "cd /mnt/ssd/projects/rolhack && docker compose restart"
 
 # Backup manual
-ssh malcomito@100.119.40.15 "docker cp rolhack:/app/data/rolhack.db /mnt/ssd/backups/rolhack/rolhack-manual.db"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker cp rolhack:/app/data/rolhack.db /mnt/ssd/backups/rolhack/rolhack-manual.db"
 
 # Ver migraciones
-ssh malcomito@100.119.40.15 "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
+ssh <YOUR_USERNAME>@<YOUR_TAILSCALE_IP> "docker exec rolhack npx prisma migrate status --schema=packages/database/prisma/schema.prisma"
 ```
 
 ---

@@ -151,7 +151,7 @@ Target: Raspberry Pi via Docker + Cloudflare Tunnel
 | Config | Value |
 |--------|-------|
 | Port | 3002 |
-| Subdomain | rolhack.euforiateclog.cloud |
+| Subdomain | (configured in .env.production) |
 | Container | `rolhack` (Docker) |
 | DB Volume | `rolhack-data` (Docker volume) |
 | Deploy | `./scripts/deploy-to-pi.sh` |
@@ -165,9 +165,9 @@ Target: Raspberry Pi via Docker + Cloudflare Tunnel
 ```
 
 ### SUPERADMIN Bootstrap
-Default: `euforiateclog@gmail.com` (configurable via `SUPERADMIN_EMAILS` env)
+Configurable via `SUPERADMIN_EMAILS` env variable.
 
-Ver: `docs/production.md` y `docs/go-live-checklist.md`
+Ver: `docs/production.example.md` y `docs/go-live-checklist.example.md`
 
 ## Engine Types & Contracts
 

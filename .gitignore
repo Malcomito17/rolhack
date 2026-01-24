@@ -46,3 +46,7 @@ coverage
 
 # Misc
 *.tsbuildinfo
+
+# Sensitive documentation (use .example versions)
+docs/production.md
+docs/go-live-checklist.md
