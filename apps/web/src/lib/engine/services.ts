@@ -185,18 +185,22 @@ export async function createRun(
 
 /**
  * Attempt to hack the current node
- * PROMPT 7: No longer accepts nodeId - always hacks current position
+ * Two-phase hack system:
+ * - Phase 1: inputValue >= CD = success, inputValue < CD = needs phase 2
+ * - Phase 2: failDieRoll (1 to failDie) determines failure type
  */
 export async function attemptHackService(
   runId: string,
-  inputValue: number
+  inputValue: number,
+  failDieRoll?: number
 ): Promise<AttemptHackResult> {
   const { runState, projectData } = await getRunWithDefinition(runId)
 
   const { newState, result } = engineAttemptHack(
     runState,
     projectData,
-    inputValue
+    inputValue,
+    failDieRoll
   )
 
   // Save state if changed

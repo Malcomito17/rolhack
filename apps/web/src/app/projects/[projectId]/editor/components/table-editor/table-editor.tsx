@@ -30,12 +30,16 @@ export function TableEditor({
 }: Props) {
   const [activeTable, setActiveTable] = useState<'nodes' | 'links'>('nodes')
 
+  // Fail die options (D3 to D20)
+  const failDieOptions = Array.from({ length: 18 }, (_, i) => i + 3) // [3, 4, 5, ..., 20]
+
   // New node form state (ID is auto-generated)
   const [newNode, setNewNode] = useState<{
     name: string
     description: string
     level: number
     cd: number
+    failDie: number
     criticalFailMode: FailMode
     rangeFailMode: FailMode
     rangeErrorMessage: string
@@ -45,6 +49,7 @@ export function TableEditor({
     description: '',
     level: 0,
     cd: 11,  // Default, min is 4 (must be > 3)
+    failDie: 4, // Default D4
     criticalFailMode: 'BLOQUEO',
     rangeFailMode: 'WARNING',
     rangeErrorMessage: '',
@@ -82,6 +87,7 @@ export function TableEditor({
       description: '',
       level: 0,
       cd: 11,
+      failDie: 4,
       criticalFailMode: 'BLOQUEO',
       rangeFailMode: 'WARNING',
       rangeErrorMessage: '',
@@ -167,8 +173,9 @@ export function TableEditor({
                     <th className="py-2 px-2">Nombre</th>
                     <th className="py-2 px-2">Level</th>
                     <th className="py-2 px-2">CD</th>
-                    <th className="py-2 px-2 text-red-400" title="Rolls 1-2">Crítico</th>
-                    <th className="py-2 px-2 text-yellow-400" title="Rolls 3 a CD-1">Rango</th>
+                    <th className="py-2 px-2 text-purple-400" title="Dado de fallo (D3-D20)">Dado</th>
+                    <th className="py-2 px-2 text-red-400" title="Dado 1-2">Crítico</th>
+                    <th className="py-2 px-2 text-yellow-400" title="Dado 3 a D">Rango</th>
                     <th className="py-2 px-2 text-yellow-400">Mensaje Error</th>
                     <th className="py-2 px-2">Visible</th>
                     <th className="py-2 px-2"></th>
@@ -209,6 +216,17 @@ export function TableEditor({
                           className="w-16 bg-transparent border-b border-transparent hover:border-gray-600 focus:border-cyber-primary focus:outline-none px-1 py-0.5 text-center"
                           min={3}
                         />
+                      </td>
+                      <td className="py-2 px-2">
+                        <select
+                          value={node.failDie || 4}
+                          onChange={(e) => onUpdateNode(selectedCircuitId, node.id, { failDie: parseInt(e.target.value) })}
+                          className="bg-cyber-darker border border-purple-900 rounded px-2 py-1 text-xs"
+                        >
+                          {failDieOptions.map((d) => (
+                            <option key={d} value={d}>D{d}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="py-2 px-2">
                         <select
@@ -292,6 +310,17 @@ export function TableEditor({
                         className="w-16 bg-cyber-darker border border-gray-700 rounded px-2 py-1 text-sm text-center"
                         min={3}
                       />
+                    </td>
+                    <td className="py-2 px-2">
+                      <select
+                        value={newNode.failDie}
+                        onChange={(e) => setNewNode({ ...newNode, failDie: parseInt(e.target.value) })}
+                        className="bg-cyber-darker border border-purple-900 rounded px-2 py-1 text-xs"
+                      >
+                        {failDieOptions.map((d) => (
+                          <option key={d} value={d}>D{d}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="py-2 px-2">
                       <select

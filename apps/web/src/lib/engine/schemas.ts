@@ -20,6 +20,8 @@ const NodeDefinitionRawSchema = z.object({
   description: z.string().optional(),
   level: z.number().int().min(0),
   cd: z.number().int().min(0), // 0 allowed for entry nodes
+  // Fail die (D3-D20) - required for phase 2 fail determination
+  failDie: z.number().int().min(3).max(20),
   // Legacy field for backward compatibility
   failMode: FailModeSchema.optional(),
   // New fields for expanded failMode system
@@ -41,6 +43,7 @@ export const NodeDefinitionSchema = NodeDefinitionRawSchema.transform((node) => 
   description: node.description,
   level: node.level,
   cd: node.cd,
+  failDie: node.failDie,
   // Migration: use new fields if present, otherwise fall back to legacy failMode
   criticalFailMode: node.criticalFailMode ?? node.failMode ?? 'BLOQUEO',
   rangeFailMode: node.rangeFailMode ?? node.failMode ?? 'WARNING',
@@ -186,9 +189,13 @@ export const CreateRunInputSchema = z.object({
 
 /**
  * PROMPT 7: No longer accepts nodeId - hack always applies to current position
+ * Two-phase hack system:
+ * - Phase 1: inputValue >= CD = success, inputValue < CD = needs phase 2
+ * - Phase 2: failDieRoll (1 to failDie) determines failure type
  */
 export const AttemptHackInputSchema = z.object({
   inputValue: z.number().int().min(0),
+  failDieRoll: z.number().int().min(1).max(20).optional(), // Phase 2 fail die roll
 })
 
 export const MoveToNodeInputSchema = z.object({

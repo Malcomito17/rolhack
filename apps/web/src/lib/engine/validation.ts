@@ -48,6 +48,7 @@ function convertZodErrors(zodError: z.ZodError): ValidationError[] {
  * 5. Unique link IDs within each circuit
  * 6. Unique circuit IDs within project
  * 7. CD must be >= 0 (0 allowed for entry nodes)
+ * 8. failDie must be present and in range 3-20 (BLOCKING validation)
  */
 export function validateProjectDataFull(data: unknown): ValidationResult {
   const errors: ValidationError[] = []
@@ -112,6 +113,21 @@ export function validateProjectDataFull(data: unknown): ValidationResult {
           path: ['circuits', circuitIdx, 'nodes', nodeIdx, 'cd'],
           code: 'INVALID_CD',
           message: `CD debe ser >= 0 en nodo "${node.name}"`,
+        })
+      }
+
+      // Rule: failDie must be present and in range 3-20 (BLOCKING)
+      if (node.failDie === undefined || node.failDie === null) {
+        errors.push({
+          path: ['circuits', circuitIdx, 'nodes', nodeIdx, 'failDie'],
+          code: 'MISSING_FAIL_DIE',
+          message: `Dado de fallo (failDie) es requerido en nodo "${node.name}"`,
+        })
+      } else if (node.failDie < 3 || node.failDie > 20) {
+        errors.push({
+          path: ['circuits', circuitIdx, 'nodes', nodeIdx, 'failDie'],
+          code: 'INVALID_FAIL_DIE',
+          message: `Dado de fallo debe ser entre D3 y D20 en nodo "${node.name}" (valor: D${node.failDie})`,
         })
       }
     }

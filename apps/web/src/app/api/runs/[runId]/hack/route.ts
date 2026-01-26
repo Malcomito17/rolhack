@@ -47,10 +47,11 @@ export async function POST(
       )
     }
 
-    // Attempt hack (PROMPT 7: always hacks current position)
+    // Attempt hack with two-phase system
     const result = await attemptHackService(
       runId,
-      parsed.data.inputValue
+      parsed.data.inputValue,
+      parsed.data.failDieRoll
     )
 
     return NextResponse.json(result)

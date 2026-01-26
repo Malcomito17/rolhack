@@ -27,6 +27,7 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Punto de entrada al sistema. Acceso garantizado.',
           level: 0,
           cd: 0, // Entry node - auto-accessible
+          failDie: 6, // D6 for tutorial
           criticalFailMode: 'WARNING',
           rangeFailMode: 'WARNING',
           visibleByDefault: true,
@@ -37,6 +38,7 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Un firewall con configuracion estandar. CD: 11',
           level: 1,
           cd: 11, // Minimum CD as per requirements
+          failDie: 6, // D6 for tutorial
           criticalFailMode: 'BLOQUEO',
           rangeFailMode: 'WARNING',
           rangeErrorMessage: 'FIREWALL TRACE — CONEXION RECHAZADA',
@@ -48,6 +50,7 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Acceso alternativo descubierto mediante escaneo. CD: 12',
           level: 1,
           cd: 12,
+          failDie: 6, // D6 for tutorial
           criticalFailMode: 'BLOQUEO',
           rangeFailMode: 'WARNING',
           rangeErrorMessage: 'PUERTO DETECTADO — ACCESO DENEGADO',
@@ -59,6 +62,7 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Servidor de datos corporativos. CD: 15',
           level: 2,
           cd: 15,
+          failDie: 8, // D8 - slightly harder
           criticalFailMode: 'BLOQUEO',
           rangeFailMode: 'WARNING',
           rangeErrorMessage: 'DATABASE ALERT — QUERY BLOQUEADA',
@@ -70,6 +74,7 @@ export const TUTORIAL_PROJECT_DATA: ProjectData = {
           description: 'Objetivo final. Maxima seguridad. CD: 20',
           level: 3,
           cd: 20, // Maximum CD as per requirements
+          failDie: 10, // D10 - hardest
           criticalFailMode: 'BLOQUEO',
           rangeFailMode: 'BLOQUEO', // Teaches blocking on failure
           visibleByDefault: true,

@@ -27,9 +27,10 @@ export interface NodeDefinition {
   name: string
   description?: string
   level: number // 0 = entry point, higher = deeper in the network
-  cd: number // Challenge Difficulty - value needed to hack
-  criticalFailMode: FailMode // What happens on rolls 1-2 (critical failure)
-  rangeFailMode: FailMode // What happens on rolls 3 to CD-1 (range failure)
+  cd: number // Challenge Difficulty - value needed to hack (first roll >= CD = success)
+  failDie: number // Fail die (D3-D20) - determines fail roll range in phase 2
+  criticalFailMode: FailMode // What happens on fail die rolls 1-2 (critical failure)
+  rangeFailMode: FailMode // What happens on fail die rolls 3 to failDie (range failure)
   rangeErrorMessage?: string // Custom message for WARNING in range failure
   visibleByDefault: boolean // Is this node visible at run start?
   isFinal?: boolean // Final node - hacking completes the circuit (only 1 per circuit)
@@ -282,6 +283,7 @@ export interface AttemptHackInput {
   runId: string
   nodeId: string
   inputValue: number
+  failDieRoll?: number // Phase 2: fail die roll (1 to failDie)
 }
 
 export interface AttemptHackResult {
@@ -293,6 +295,9 @@ export interface AttemptHackResult {
   gameOver?: boolean // True if this is a critical game-ending failure (CD=1-2 + block)
   warning?: Warning
   message: string
+  // Phase 2 support
+  needsPhase2?: boolean // True if first roll failed and needs fail die roll
+  failDie?: number // The fail die value (D3-D20) for phase 2 input validation
 }
 
 export interface DiscoverLinksInput {

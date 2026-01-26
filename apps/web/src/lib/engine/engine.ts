@@ -308,20 +308,21 @@ export function hasHiddenLinksAvailable(
 /**
  * Attempt to hack the current node
  *
- * RULES (PROMPT 7/8):
- * - Hack always applies to current position node
- * - Roll < 3 = BLOCKED always (critical failure)
- * - Roll >= cd = HACKED (success)
- * - 3 <= roll < cd = depends on failMode (WARNING allows retry, BLOQUEO blocks)
+ * TWO-PHASE HACK SYSTEM:
+ * - Phase 1: inputValue >= CD = SUCCESS (immediate)
+ * - Phase 1: inputValue < CD = needs Phase 2 (fail die roll)
+ * - Phase 2: failDieRoll 1-2 = critical failure (criticalFailMode)
+ * - Phase 2: failDieRoll 3-failDie = range failure (rangeFailMode)
  *
- * DIEGETIC MESSAGES (PROMPT 8):
+ * DIEGETIC MESSAGES:
  * - No CD, failMode, or threshold information revealed to user
  * - Use system-style messages: ACCESS GRANTED, LOCKDOWN, etc.
  */
 export function attemptHack(
   state: RunState,
   data: ProjectData,
-  inputValue: number
+  inputValue: number,
+  failDieRoll?: number
 ): { newState: RunState; result: AttemptHackResult } {
   // Ensure numeric conversion
   const roll = Number(inputValue)
@@ -416,13 +417,115 @@ export function attemptHack(
   const newState = structuredClone(state)
   const newNodeState = newState.nodes[nodeId]
 
-  // Increment attempts
-  newNodeState.intentos++
-
   const timestamp = new Date().toISOString()
 
-  // RULE 1: Roll < 3 (1-2) = CRITICAL FAILURE - Use criticalFailMode
-  if (roll < 3) {
+  // =========================================================================
+  // PHASE 1: Check if roll >= CD (SUCCESS)
+  // =========================================================================
+  if (roll >= cd) {
+    // Increment attempts only when actually processing
+    newNodeState.intentos++
+    newNodeState.hackeado = true
+    newNodeState.ultimoResultado = 'exito'
+    newState.lastHackedNodeByCircuit[circuit.id] = nodeId
+
+    // Record NODE_HACKED timeline event
+    const hackEvent = createTimelineEvent(
+      'NODE_HACKED',
+      newState,
+      circuit.id,
+      `Nodo ${node.name} comprometido`,
+      { nodeId }
+    )
+    newState.timeline = [...newState.timeline, hackEvent]
+
+    // Check if this was the final node (circuit complete)
+    const isFinalNode = node.isFinal === true
+    let circuitJustCompleted = false
+
+    // Check for circuit completion (final node hacked or all nodes hacked)
+    if (isCircuitCompleted(newState, circuit) && !newState.completedCircuits?.[circuit.id]) {
+      // Mark circuit as completed
+      if (!newState.completedCircuits) newState.completedCircuits = {}
+      newState.completedCircuits[circuit.id] = true
+      circuitJustCompleted = true
+
+      const circuitCompleteEvent = createTimelineEvent(
+        'CIRCUIT_COMPLETED',
+        newState,
+        circuit.id,
+        `Circuito ${circuit.name} completado`
+      )
+      newState.timeline = [...newState.timeline, circuitCompleteEvent]
+
+      // Check for run completion
+      if (isRunCompleted(newState, data)) {
+        const runCompleteEvent = createTimelineEvent(
+          'RUN_COMPLETED',
+          newState,
+          circuit.id,
+          'Run completada - Todos los circuitos comprometidos'
+        )
+        newState.timeline = [...newState.timeline, runCompleteEvent]
+      }
+    }
+
+    return {
+      newState,
+      result: {
+        success: true,
+        hackeado: true,
+        bloqueado: false,
+        circuitCompleted: circuitJustCompleted,
+        message: isFinalNode && circuitJustCompleted
+          ? 'FINAL NODE COMPROMISED — CIRCUIT COMPLETE'
+          : 'ACCESS GRANTED — SECURITY HANDSHAKE ACCEPTED',
+      },
+    }
+  }
+
+  // =========================================================================
+  // PHASE 1 FAILED: roll < CD - Need Phase 2
+  // =========================================================================
+
+  // If no failDieRoll provided, return that we need phase 2
+  if (failDieRoll === undefined || failDieRoll === null) {
+    return {
+      newState: state, // Don't modify state yet - wait for phase 2
+      result: {
+        success: false,
+        hackeado: false,
+        bloqueado: false,
+        needsPhase2: true,
+        failDie: node.failDie,
+        message: 'ACCESS DENIED — SECURITY COUNTERMEASURE ACTIVATED — AWAITING RESPONSE',
+      },
+    }
+  }
+
+  // =========================================================================
+  // PHASE 2: Process fail die roll
+  // =========================================================================
+
+  // Validate failDieRoll is in range
+  const failRoll = Number(failDieRoll)
+  if (failRoll < 1 || failRoll > node.failDie) {
+    return {
+      newState: state,
+      result: {
+        success: false,
+        hackeado: false,
+        bloqueado: false,
+        message: `INVALID RESPONSE — VALUE MUST BE 1-${node.failDie}`,
+      },
+    }
+  }
+
+  // Increment attempts now that we're processing the full hack
+  newNodeState.intentos++
+
+  // PHASE 2 RULE 1: failRoll 1-2 = CRITICAL FAILURE
+  if (failRoll <= 2) {
     // Check criticalFailMode - if WARNING, allow retry
     if (node.criticalFailMode === 'WARNING') {
       newNodeState.ultimoResultado = 'fallo'
@@ -505,68 +608,7 @@ export function attemptHack(
     }
   }
 
-  // RULE 2: Roll >= CD = SUCCESS
-  if (roll >= cd) {
-    newNodeState.hackeado = true
-    newNodeState.ultimoResultado = 'exito'
-    newState.lastHackedNodeByCircuit[circuit.id] = nodeId
-
-    // Record NODE_HACKED timeline event
-    const hackEvent = createTimelineEvent(
-      'NODE_HACKED',
-      newState,
-      circuit.id,
-      `Nodo ${node.name} comprometido`,
-      { nodeId }
-    )
-    newState.timeline = [...newState.timeline, hackEvent]
-
-    // Check if this was the final node (circuit complete)
-    const isFinalNode = node.isFinal === true
-    let circuitJustCompleted = false
-
-    // Check for circuit completion (final node hacked or all nodes hacked)
-    if (isCircuitCompleted(newState, circuit) && !newState.completedCircuits?.[circuit.id]) {
-      // Mark circuit as completed
-      if (!newState.completedCircuits) newState.completedCircuits = {}
-      newState.completedCircuits[circuit.id] = true
-      circuitJustCompleted = true
-
-      const circuitCompleteEvent = createTimelineEvent(
-        'CIRCUIT_COMPLETED',
-        newState,
-        circuit.id,
-        `Circuito ${circuit.name} completado`
-      )
-      newState.timeline = [...newState.timeline, circuitCompleteEvent]
-
-      // Check for run completion
-      if (isRunCompleted(newState, data)) {
-        const runCompleteEvent = createTimelineEvent(
-          'RUN_COMPLETED',
-          newState,
-          circuit.id,
-          'Run completada - Todos los circuitos comprometidos'
-        )
-        newState.timeline = [...newState.timeline, runCompleteEvent]
-      }
-    }
-
-    return {
-      newState,
-      result: {
-        success: true,
-        hackeado: true,
-        bloqueado: false,
-        circuitCompleted: circuitJustCompleted,
-        message: isFinalNode && circuitJustCompleted
-          ? 'FINAL NODE COMPROMISED — CIRCUIT COMPLETE'
-          : 'ACCESS GRANTED — SECURITY HANDSHAKE ACCEPTED',
-      },
-    }
-  }
-
-  // RULE 3: 3 <= roll < CD = Depends on rangeFailMode
+  // PHASE 2 RULE 2: failRoll 3 to failDie = RANGE FAILURE
   newNodeState.ultimoResultado = 'fallo'
   let warning: Warning
 

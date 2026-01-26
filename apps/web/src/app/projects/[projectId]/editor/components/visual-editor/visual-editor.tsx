@@ -40,6 +40,9 @@ export function VisualEditor({
   const [showAddLink, setShowAddLink] = useState(false)
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
 
+  // Fail die options (D3 to D20)
+  const failDieOptions = Array.from({ length: 18 }, (_, i) => i + 3) // [3, 4, 5, ..., 20]
+
   // Form states
   const [newCircuit, setNewCircuit] = useState({ id: '', name: '', description: '' })
   const [newNode, setNewNode] = useState<{
@@ -47,12 +50,13 @@ export function VisualEditor({
     description: string
     level: number
     cd: number
+    failDie: number
     criticalFailMode: 'WARNING' | 'BLOQUEO'
     rangeFailMode: 'WARNING' | 'BLOQUEO'
     rangeErrorMessage: string
     visibleByDefault: boolean
   }>({
-    name: '', description: '', level: 0, cd: 11, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true
+    name: '', description: '', level: 0, cd: 11, failDie: 4, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true
   })
 
   // Auto-generate unique IDs
@@ -87,7 +91,7 @@ export function VisualEditor({
       id: generateNodeId(),
     }
     onAddNode(selectedCircuitId, nodeWithId)
-    setNewNode({ name: '', description: '', level: 0, cd: 11, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true })
+    setNewNode({ name: '', description: '', level: 0, cd: 11, failDie: 4, criticalFailMode: 'BLOQUEO', rangeFailMode: 'WARNING', rangeErrorMessage: '', visibleByDefault: true })
     setShowAddNode(false)
   }
 
@@ -299,6 +303,16 @@ export function VisualEditor({
                 </div>
                 <div className="flex gap-2">
                   <select
+                    value={newNode.failDie}
+                    onChange={(e) => setNewNode({ ...newNode, failDie: parseInt(e.target.value) })}
+                    className="bg-cyber-dark border border-purple-900 rounded px-2 py-2 text-sm"
+                    title="Dado de fallo"
+                  >
+                    {failDieOptions.map((d) => (
+                      <option key={d} value={d}>D{d}</option>
+                    ))}
+                  </select>
+                  <select
                     value={newNode.criticalFailMode}
                     onChange={(e) => setNewNode({ ...newNode, criticalFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
                     className="bg-cyber-dark border border-red-900 rounded px-2 py-2 text-sm"
@@ -311,7 +325,7 @@ export function VisualEditor({
                     value={newNode.rangeFailMode}
                     onChange={(e) => setNewNode({ ...newNode, rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
                     className="bg-cyber-dark border border-yellow-900 rounded px-2 py-2 text-sm"
-                    title="Rango (3 a CD-1)"
+                    title="Rango (3 a D)"
                   >
                     <option value="WARNING">W</option>
                     <option value="BLOQUEO">B</option>
@@ -460,6 +474,18 @@ export function VisualEditor({
                                 max={20}
                               />
                             </div>
+                            <div>
+                              <label className="text-xs text-purple-400 block mb-1">Dado de Fallo</label>
+                              <select
+                                value={node.failDie || 4}
+                                onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { failDie: parseInt(e.target.value) })}
+                                className="w-full bg-cyber-dark border border-purple-900 rounded px-2 py-1 text-xs"
+                              >
+                                {failDieOptions.map((d) => (
+                                  <option key={d} value={d}>D{d}</option>
+                                ))}
+                              </select>
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="text-xs text-red-400 block mb-1">Crítico (1-2)</label>
@@ -473,7 +499,7 @@ export function VisualEditor({
                                 </select>
                               </div>
                               <div>
-                                <label className="text-xs text-yellow-400 block mb-1">Rango (3 a CD-1)</label>
+                                <label className="text-xs text-yellow-400 block mb-1">Rango (3 a D)</label>
                                 <select
                                   value={node.rangeFailMode}
                                   onChange={(e) => onUpdateNode(selectedCircuitId!, node.id, { rangeFailMode: e.target.value as 'WARNING' | 'BLOQUEO' })}
@@ -613,7 +639,7 @@ export function VisualEditor({
                             </div>
                             <div className="text-xs text-gray-500 space-y-0.5">
                               <p className="font-mono">{node.id}</p>
-                              <p>CD: {node.cd}</p>
+                              <p>CD: {node.cd} | <span className="text-purple-400">D{node.failDie || 4}</span></p>
                               {!node.visibleByDefault && (
                                 <p className="text-cyber-accent">Oculto</p>
                               )}
