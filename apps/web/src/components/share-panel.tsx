@@ -352,7 +352,7 @@ function QRModal({
 
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4"
         style={{ backgroundColor: `${bgColor}ee` }}
         onClick={onClose}
       >
@@ -369,8 +369,9 @@ function QRModal({
               <span style={{ color: `${primaryColor}88` }}>]</span>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="text-sm"
+              className="text-sm hover:opacity-70 transition-opacity cursor-pointer"
               style={{ color: `${textColor}66` }}
             >
               [X]
@@ -423,7 +424,7 @@ function QRModal({
   // TECH variant
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
@@ -441,8 +442,9 @@ function QRModal({
             <h3 className="text-lg font-mono font-bold text-cyber-accent">QR CODE</h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-white transition-colors"
+            className="p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

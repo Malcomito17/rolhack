@@ -22,7 +22,7 @@ interface Props {
     terminology?: Partial<ThemeTerminology>
   }
   effects: Partial<ThemeEffects>
-  onHack: (inputValue: number) => AttemptHackResult
+  onHack: (inputValue: number, failDieRoll?: number) => AttemptHackResult
   onDiscover: () => DiscoverLinksResult
   onMove: (targetNodeId: string) => MoveToNodeResult
 }
@@ -60,10 +60,16 @@ export function DemoImmersiveView({
 
   const [loading, setLoading] = useState(false)
   const [hackInput, setHackInput] = useState('')
-  const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info'; text: string }[]>([])
+  const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info' | 'warning'; text: string }[]>([])
   const terminalRef = useRef<HTMLDivElement>(null)
   const [showGameOver, setShowGameOver] = useState(false)
   const [gameOverMessage, setGameOverMessage] = useState('')
+
+  // Phase 2 state (fail die roll after failed CD check)
+  const [pendingPhase2, setPendingPhase2] = useState(false)
+  const [phase2FailDie, setPhase2FailDie] = useState<number>(0)
+  const [phase2Input, setPhase2Input] = useState('')
+  const [phase1Value, setPhase1Value] = useState<number>(0)
 
   // Get current circuit and node
   const currentCircuit = projectData.circuits.find(c => c.id === state.position.circuitId)
@@ -143,7 +149,7 @@ export function DemoImmersiveView({
   const availableMoves = getAvailableMoves()
 
   // Add terminal line
-  const addLine = (type: 'system' | 'user' | 'success' | 'error' | 'info', text: string) => {
+  const addLine = (type: 'system' | 'user' | 'success' | 'error' | 'info' | 'warning', text: string) => {
     setTerminalLines(prev => [...prev.slice(-50), { type, text }])
   }
 
@@ -174,11 +180,27 @@ export function DemoImmersiveView({
   function doHack() {
     if (!hackInput) return
     setLoading(true)
+    const inputVal = parseInt(hackInput, 10)
     addLine('user', `> EXEC BREACH [${hackInput}]`)
 
     // Small delay for visual effect
     setTimeout(() => {
-      const result = onHack(parseInt(hackInput, 10))
+      const result = onHack(inputVal)
+
+      // Check if phase 2 is needed (first roll failed CD check)
+      if (result.needsPhase2) {
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('warning', `> ${terminology.phase2Required || 'BREACH FAILED — SYSTEM COUNTERATTACK'}`)
+        addLine('warning', `> ${terminology.phase2Instruction || 'ROLL FAIL DIE'}: D${result.failDie} (1-${result.failDie})`)
+        addLine('warning', '> ════════════════════════════════════════')
+        // Store values and enter phase 2 mode
+        setPhase1Value(inputVal)
+        setPhase2FailDie(result.failDie || 4)
+        setPendingPhase2(true)
+        setHackInput('')
+        setLoading(false)
+        return
+      }
 
       if (result.success) {
         addLine('success', `> ${result.message}`)
@@ -201,12 +223,71 @@ export function DemoImmersiveView({
       }
 
       if (result.warning) {
-        addLine('error', `> WARNING: ${result.warning.severity} - ${result.warning.message}`)
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('warning', `> ⚠ ${result.warning.message}`)
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('info', `> ${terminology.retryAvailable || 'RETRY AVAILABLE — SYSTEM STILL ACCESSIBLE'}`)
       }
 
       setHackInput('')
       setLoading(false)
     }, 300)
+  }
+
+  // Phase 2 hack - submit fail die roll after phase 1 failure
+  function doPhase2Hack() {
+    if (!phase2Input) return
+    setLoading(true)
+    const failDieRoll = parseInt(phase2Input, 10)
+    addLine('user', `> FAIL DIE ROLL: [${failDieRoll}] (D${phase2FailDie})`)
+
+    setTimeout(() => {
+      const result = onHack(phase1Value, failDieRoll)
+
+      // Reset phase 2 state
+      setPendingPhase2(false)
+      setPhase2Input('')
+      setPhase2FailDie(0)
+      setPhase1Value(0)
+
+      if (result.success) {
+        addLine('success', `> ${result.message}`)
+      } else {
+        addLine('error', `> ${result.message}`)
+
+        // Check for circuit blocked
+        if (result.circuitBlocked) {
+          addLine('error', '> ═══════════════════════════════════════')
+          addLine('error', '> CIRCUIT LOCKDOWN INITIATED')
+          addLine('error', '> ALL ACCESS TO THIS NETWORK REVOKED')
+          addLine('error', '> ═══════════════════════════════════════')
+        }
+
+        // Check for game over
+        if (result.gameOver) {
+          setGameOverMessage(result.message)
+          setShowGameOver(true)
+        }
+      }
+
+      if (result.warning) {
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('warning', `> ⚠ ${result.warning.message}`)
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('info', `> ${terminology.retryAvailable || 'RETRY AVAILABLE — SYSTEM STILL ACCESSIBLE'}`)
+      }
+
+      setLoading(false)
+    }, 300)
+  }
+
+  // Cancel phase 2 (reset to normal state without submitting)
+  const cancelPhase2 = () => {
+    setPendingPhase2(false)
+    setPhase2Input('')
+    setPhase2FailDie(0)
+    setPhase1Value(0)
+    addLine('info', '> FAIL DIE ROLL CANCELLED')
   }
 
   function doDiscover() {
@@ -247,10 +328,17 @@ export function DemoImmersiveView({
     }, 200)
   }
 
-  // Handle key press
+  // Handle key press for phase 1
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && hackInput) {
       doHack()
+    }
+  }
+
+  // Handle key press for phase 2
+  const handlePhase2KeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && phase2Input) {
+      doPhase2Hack()
     }
   }
 
@@ -311,11 +399,13 @@ export function DemoImmersiveView({
                 line.type === 'user' ? '' :
                 line.type === 'success' ? 'font-bold' :
                 line.type === 'error' ? 'font-bold' :
+                line.type === 'warning' ? 'font-bold animate-pulse' :
                 'opacity-80'
               }`}
               style={{
                 color: line.type === 'error' ? '#ff5555' :
                        line.type === 'success' ? primaryColor :
+                       line.type === 'warning' ? '#ffaa00' :
                        line.type === 'info' ? secondaryColor :
                        textColor
               }}
@@ -398,8 +488,88 @@ export function DemoImmersiveView({
                 </div>
               ) : (
                 <>
-                  {/* Hack input - only show if not hacked and not blocked */}
-                  {currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
+                  {/* Phase 2 Input - Fail die roll after failed CD check */}
+                  {pendingPhase2 && (
+                    <div
+                      className="flex flex-col sm:flex-row gap-2 p-2 sm:p-3 rounded w-full animate-pulse"
+                      style={{
+                        backgroundColor: '#ff660022',
+                        border: `2px solid #ff6600`,
+                        boxShadow: '0 0 20px #ff660044, inset 0 0 30px #ff660011',
+                      }}
+                    >
+                      <div className="flex flex-col gap-1 flex-1">
+                        <span
+                          className="text-[10px] sm:text-xs font-bold tracking-wider"
+                          style={{ color: '#ff9900' }}
+                        >
+                          ⚠ {terminology.phase2Title || 'DADO DE FALLO REQUERIDO'}
+                        </span>
+                        <span
+                          className="text-[9px] sm:text-[10px] opacity-80"
+                          style={{ color: '#ffaa00' }}
+                        >
+                          {terminology.phase2Range || 'INGRESA VALOR'}: 1 - {phase2FailDie} (D{phase2FailDie})
+                        </span>
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <input
+                          type="number"
+                          value={phase2Input}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= phase2FailDie)) {
+                              setPhase2Input(val)
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value)
+                            if (!isNaN(val)) {
+                              setPhase2Input(String(Math.max(1, Math.min(phase2FailDie, val))))
+                            }
+                          }}
+                          onKeyPress={handlePhase2KeyPress}
+                          placeholder={`1-${phase2FailDie}`}
+                          min={1}
+                          max={phase2FailDie}
+                          autoFocus
+                          className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1.5 text-center text-sm sm:text-base font-bold focus:outline-none"
+                          style={{
+                            border: `2px solid #ff9900`,
+                            color: '#ffcc00',
+                            backgroundColor: '#1a0a0022',
+                          }}
+                          disabled={loading}
+                        />
+                        <button
+                          onClick={doPhase2Hack}
+                          disabled={loading || !phase2Input}
+                          className="px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                          style={{
+                            border: `2px solid #ff9900`,
+                            color: '#ffcc00',
+                            backgroundColor: '#ff660033',
+                          }}
+                        >
+                          D{phase2FailDie}
+                        </button>
+                        <button
+                          onClick={cancelPhase2}
+                          disabled={loading}
+                          className="px-2 py-1.5 rounded text-[10px] sm:text-xs opacity-60 hover:opacity-100 transition-opacity"
+                          style={{
+                            border: `1px solid #ff660066`,
+                            color: '#ff6600',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hack input - only show if not hacked and not blocked AND not in phase 2 */}
+                  {!pendingPhase2 && currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
                     <div className="flex gap-1">
                       <input
                         type="number"
@@ -457,36 +627,40 @@ export function DemoImmersiveView({
                     </div>
                   )}
 
-                  {/* Move buttons */}
-                  {availableMoves.fastTravel.map(node => (
-                    <button
-                      key={node.id}
-                      onClick={() => doMove(node.id, node.name)}
-                      disabled={loading}
-                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                      style={{
-                        border: `1px solid ${primaryColor}aa`,
-                        color: primaryColor,
-                      }}
-                    >
-                      <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
-                    </button>
-                  ))}
+                  {/* Move buttons - hidden during phase 2 */}
+                  {!pendingPhase2 && (
+                    <>
+                      {availableMoves.fastTravel.map(node => (
+                        <button
+                          key={node.id}
+                          onClick={() => doMove(node.id, node.name)}
+                          disabled={loading}
+                          className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                          style={{
+                            border: `1px solid ${primaryColor}aa`,
+                            color: primaryColor,
+                          }}
+                        >
+                          <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
+                        </button>
+                      ))}
 
-                  {availableMoves.advance.map(node => (
-                    <button
-                      key={node.id}
-                      onClick={() => doMove(node.id, node.name)}
-                      disabled={loading}
-                      className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                      style={{
-                        border: `1px solid ${semanticColors.pendingNode}88`,
-                        color: semanticColors.pendingNode,
-                      }}
-                    >
-                      &gt; {node.name}
-                    </button>
-                  ))}
+                      {availableMoves.advance.map(node => (
+                        <button
+                          key={node.id}
+                          onClick={() => doMove(node.id, node.name)}
+                          disabled={loading}
+                          className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                          style={{
+                            border: `1px solid ${semanticColors.pendingNode}88`,
+                            color: semanticColors.pendingNode,
+                          }}
+                        >
+                          &gt; {node.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </>
               )}
             </div>

@@ -88,8 +88,8 @@ export default function DemoPage() {
 
   // Engine action handlers (local, no API)
   // Note: These are only called when state is defined (after loading)
-  const handleHack = useCallback((inputValue: number) => {
-    const { newState, result } = attemptHack(state!, TUTORIAL_PROJECT_DATA, inputValue)
+  const handleHack = useCallback((inputValue: number, failDieRoll?: number) => {
+    const { newState, result } = attemptHack(state!, TUTORIAL_PROJECT_DATA, inputValue, failDieRoll)
     updateState(newState)
     return result
   }, [state, updateState])

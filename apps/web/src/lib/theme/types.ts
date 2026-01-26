@@ -49,6 +49,12 @@ export interface ThemeTerminology {
   scanEmpty: string        // No hidden links found
   moveSuccess: string      // Success message when moving
 
+  // Phase 2 (fail die roll) messages
+  phase2Required: string   // "BREACH FAILED — SYSTEM COUNTERATTACK"
+  phase2Instruction: string // "ROLL FAIL DIE"
+  phase2Title: string      // "DADO DE FALLO REQUERIDO"
+  phase2Range: string      // "INGRESA VALOR"
+
   // Game states
   gameOver: string         // "GAME OVER" / "FIN DEL JUEGO" / "TU MENTE COLAPSA"
   circuitLockdown: string  // "CIRCUIT LOCKDOWN" / "MAZMORRA SELLADA" / "DIMENSION CERRADA"
@@ -217,6 +223,10 @@ export const DEFAULT_TERMINOLOGY: ThemeTerminology = {
   scanSuccess: 'RUTAS DESCUBIERTAS',
   scanEmpty: 'NO SE ENCONTRARON RUTAS OCULTAS',
   moveSuccess: 'POSICION ACTUALIZADA',
+  phase2Required: 'BREACH FALLIDO — CONTRAATAQUE DEL SISTEMA',
+  phase2Instruction: 'LANZA DADO DE FALLO',
+  phase2Title: 'DADO DE FALLO REQUERIDO',
+  phase2Range: 'INGRESA VALOR',
   gameOver: 'GAME OVER',
   circuitLockdown: 'CIRCUIT LOCKDOWN',
   map: 'MAP',
@@ -285,6 +295,10 @@ export const MEDIEVAL_TERMINOLOGY: ThemeTerminology = {
   scanSuccess: 'Has encontrado pasadizos ocultos.',
   scanEmpty: 'No hay pasadizos secretos aqui.',
   moveSuccess: 'Avanzas por el pasadizo...',
+  phase2Required: 'INTENTO FALLIDO — LAS TRAMPAS SE ACTIVAN',
+  phase2Instruction: 'LANZA DADO DE DESTINO',
+  phase2Title: 'DADO DE DESTINO REQUERIDO',
+  phase2Range: 'INGRESA VALOR',
   gameOver: 'HAS CAIDO',
   circuitLockdown: 'MAZMORRA SELLADA',
   map: 'MAPA',
@@ -353,6 +367,10 @@ export const CTHULHU_TERMINOLOGY: ThemeTerminology = {
   scanSuccess: 'Percibes portales entre las sombras...',
   scanEmpty: 'Las tinieblas no revelan nada... por ahora.',
   moveSuccess: 'Te deslizas entre dimensiones...',
+  phase2Required: 'INVOCACION FALLIDA — LOS ANTIGUOS RESPONDEN',
+  phase2Instruction: 'LANZA EL DADO DEL DESTINO',
+  phase2Title: 'DADO DEL DESTINO REQUERIDO',
+  phase2Range: 'INGRESA VALOR',
   gameOver: 'TU MENTE COLAPSA',
   circuitLockdown: 'LA DIMENSION SE CIERRA',
   map: 'VISION',

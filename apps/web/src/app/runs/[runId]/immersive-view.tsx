@@ -287,6 +287,12 @@ export function ImmersiveView({
   const [loading, setLoading] = useState(false)
   const [hackInput, setHackInput] = useState('')
   const [terminalLines, setTerminalLines] = useState<{ type: 'system' | 'user' | 'success' | 'error' | 'info' | 'warning'; text: string }[]>([])
+
+  // Phase 2 state (fail die roll after failed CD check)
+  const [pendingPhase2, setPendingPhase2] = useState(false)
+  const [phase2FailDie, setPhase2FailDie] = useState<number>(0)
+  const [phase2Input, setPhase2Input] = useState('')
+  const [phase1Value, setPhase1Value] = useState<number>(0) // Store phase 1 value for phase 2 call
   const terminalRef = useRef<HTMLDivElement>(null)
 
   // Get current circuit and node (using displayState for visual representation)
@@ -407,19 +413,35 @@ export function ImmersiveView({
   async function doHack() {
     if (!hackInput) return
     setLoading(true)
+    const inputVal = parseInt(hackInput, 10)
     addLine('user', `> EXEC BREACH [${hackInput}]`)
 
     try {
       const res = await fetch(`/api/runs/${runId}/hack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputValue: parseInt(hackInput, 10) }),
+        body: JSON.stringify({ inputValue: inputVal }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
         throw new Error(data.error || 'Error')
+      }
+
+      // Check if phase 2 is needed (first roll failed CD check)
+      if (data.needsPhase2) {
+        addLine('warning', '> ════════════════════════════════════════')
+        addLine('warning', `> ${terminology.phase2Required || 'BREACH FAILED — SYSTEM COUNTERATTACK'}`)
+        addLine('warning', `> ${terminology.phase2Instruction || 'ROLL FAIL DIE'}: D${data.failDie} (1-${data.failDie})`)
+        addLine('warning', '> ════════════════════════════════════════')
+        // Store values and enter phase 2 mode
+        setPhase1Value(inputVal)
+        setPhase2FailDie(data.failDie)
+        setPendingPhase2(true)
+        setHackInput('')
+        setLoading(false)
+        return
       }
 
       await refreshState()
@@ -465,6 +487,80 @@ export function ImmersiveView({
         }
       }
       setHackInput('')
+    } catch (err) {
+      addLine('error', `> ERROR: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Phase 2 hack - submit fail die roll after phase 1 failure
+  async function doPhase2Hack() {
+    if (!phase2Input) return
+    setLoading(true)
+    const failDieRoll = parseInt(phase2Input, 10)
+    addLine('user', `> FAIL DIE ROLL: [${failDieRoll}] (D${phase2FailDie})`)
+
+    try {
+      const res = await fetch(`/api/runs/${runId}/hack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputValue: phase1Value, failDieRoll }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Error')
+      }
+
+      await refreshState()
+
+      // Reset phase 2 state
+      setPendingPhase2(false)
+      setPhase2Input('')
+      setPhase2FailDie(0)
+      setPhase1Value(0)
+
+      if (data.success) {
+        addLine('success', `> ${data.message}`)
+
+        // Check for circuit completed (final node hacked)
+        if (data.circuitCompleted) {
+          addLine('success', '> ═══════════════════════════════════════')
+          addLine('success', `> ${terminology.circuitCompleted.toUpperCase()}`)
+          addLine('success', '> ═══════════════════════════════════════')
+          setCompletedCircuitName(currentCircuit?.name || terminology.circuit)
+          setShowCircuitCompleted(true)
+        }
+      } else {
+        addLine('error', `> ${data.message}`)
+
+        // Check for game over first (critical failure)
+        if (data.gameOver) {
+          addLine('error', '> ═══════════════════════════════════════')
+          addLine('error', '> FATAL ERROR — GAME OVER')
+          addLine('error', '> ═══════════════════════════════════════')
+          setGameOverMessage(data.message)
+          setShowGameOver(true)
+        }
+        // Check for circuit blocked
+        else if (data.circuitBlocked) {
+          addLine('error', '> ═══════════════════════════════════════')
+          addLine('error', '> CIRCUIT LOCKDOWN INITIATED')
+          addLine('error', '> ALL ACCESS TO THIS NETWORK REVOKED')
+          addLine('error', '> ═══════════════════════════════════════')
+          setLockdownCircuitId(state.position.circuitId)
+          setShowLockdownAlert(true)
+        }
+        // Show WARNING message
+        else if (data.warning) {
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('warning', `> ⚠ ${data.warning.message}`)
+          addLine('warning', '> ════════════════════════════════════════')
+          addLine('info', `> ${terminology.retryAvailable || 'RETRY AVAILABLE — SYSTEM STILL ACCESSIBLE'}`)
+        }
+      }
     } catch (err) {
       addLine('error', `> ERROR: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
@@ -553,11 +649,27 @@ export function ImmersiveView({
     }
   }
 
-  // Handle key press
+  // Handle key press for phase 1
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && hackInput) {
       doHack()
     }
+  }
+
+  // Handle key press for phase 2
+  const handlePhase2KeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && phase2Input) {
+      doPhase2Hack()
+    }
+  }
+
+  // Cancel phase 2 (reset to normal state without submitting)
+  const cancelPhase2 = () => {
+    setPendingPhase2(false)
+    setPhase2Input('')
+    setPhase2FailDie(0)
+    setPhase1Value(0)
+    addLine('info', '> FAIL DIE ROLL CANCELLED')
   }
 
   return (
@@ -964,8 +1076,88 @@ export function ImmersiveView({
                   </div>
                 ) : (
                   <>
-                    {/* Hack input - only show if not hacked and not blocked */}
-                    {currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
+                    {/* Phase 2 Input - Fail die roll after failed CD check */}
+                    {pendingPhase2 && (
+                      <div
+                        className="flex flex-col sm:flex-row gap-2 p-2 sm:p-3 rounded w-full animate-pulse"
+                        style={{
+                          backgroundColor: '#ff660022',
+                          border: `2px solid #ff6600`,
+                          boxShadow: '0 0 20px #ff660044, inset 0 0 30px #ff660011',
+                        }}
+                      >
+                        <div className="flex flex-col gap-1 flex-1">
+                          <span
+                            className="text-[10px] sm:text-xs font-bold tracking-wider"
+                            style={{ color: '#ff9900' }}
+                          >
+                            ⚠ {terminology.phase2Title || 'DADO DE FALLO REQUERIDO'}
+                          </span>
+                          <span
+                            className="text-[9px] sm:text-[10px] opacity-80"
+                            style={{ color: '#ffaa00' }}
+                          >
+                            {terminology.phase2Range || 'INGRESA VALOR'}: 1 - {phase2FailDie} (D{phase2FailDie})
+                          </span>
+                        </div>
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="number"
+                            value={phase2Input}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= phase2FailDie)) {
+                                setPhase2Input(val)
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value)
+                              if (!isNaN(val)) {
+                                setPhase2Input(String(Math.max(1, Math.min(phase2FailDie, val))))
+                              }
+                            }}
+                            onKeyPress={handlePhase2KeyPress}
+                            placeholder={`1-${phase2FailDie}`}
+                            min={1}
+                            max={phase2FailDie}
+                            autoFocus
+                            className="w-16 sm:w-20 bg-transparent rounded px-1 sm:px-2 py-1.5 text-center text-sm sm:text-base font-bold focus:outline-none"
+                            style={{
+                              border: `2px solid #ff9900`,
+                              color: '#ffcc00',
+                              backgroundColor: '#1a0a0022',
+                            }}
+                            disabled={loading}
+                          />
+                          <button
+                            onClick={doPhase2Hack}
+                            disabled={loading || !phase2Input}
+                            className="px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                            style={{
+                              border: `2px solid #ff9900`,
+                              color: '#ffcc00',
+                              backgroundColor: '#ff660033',
+                            }}
+                          >
+                            D{phase2FailDie}
+                          </button>
+                          <button
+                            onClick={cancelPhase2}
+                            disabled={loading}
+                            className="px-2 py-1.5 rounded text-[10px] sm:text-xs opacity-60 hover:opacity-100 transition-opacity"
+                            style={{
+                              border: `1px solid #ff660066`,
+                              color: '#ff6600',
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hack input - only show if not hacked and not blocked AND not in phase 2 */}
+                    {!pendingPhase2 && currentNodeState && !currentNodeState.hackeado && !currentNodeState.bloqueado && (
                       <div className={`flex gap-1 ${currentNode?.isFinal ? 'p-1.5 rounded' : ''}`} style={currentNode?.isFinal ? {
                         backgroundColor: `${semanticColors.success}15`,
                         border: `2px solid ${semanticColors.success}`,
@@ -1022,53 +1214,58 @@ export function ImmersiveView({
                       </div>
                     )}
 
-                    {/* Scan button - ALWAYS visible, only functional when node is hacked AND hidden links exist */}
-                    <button
-                      onClick={() => {
-                        if (currentNodeState?.hackeado && hasHiddenLinks()) {
-                          doDiscover()
-                        }
-                      }}
-                      disabled={loading}
-                      className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
-                      style={{
-                        border: `1px solid ${secondaryColor}88`,
-                        color: secondaryColor,
-                      }}
-                    >
-                      @
-                    </button>
+                    {/* Scan and Move buttons - hidden during phase 2 */}
+                    {!pendingPhase2 && (
+                      <>
+                        {/* Scan button - ALWAYS visible, only functional when node is hacked AND hidden links exist */}
+                        <button
+                          onClick={() => {
+                            if (currentNodeState?.hackeado && hasHiddenLinks()) {
+                              doDiscover()
+                            }
+                          }}
+                          disabled={loading}
+                          className="px-2 py-1 rounded text-xs sm:text-sm transition-colors"
+                          style={{
+                            border: `1px solid ${secondaryColor}88`,
+                            color: secondaryColor,
+                          }}
+                        >
+                          @
+                        </button>
 
-                    {/* Move buttons */}
-                    {availableMoves.fastTravel.map(node => (
-                      <button
-                        key={node.id}
-                        onClick={() => doMove(node.id, node.name)}
-                        disabled={loading}
-                        className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                        style={{
-                          border: `1px solid ${primaryColor}aa`,
-                          color: primaryColor,
-                        }}
-                      >
-                        <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
-                      </button>
-                    ))}
+                        {/* Move buttons */}
+                        {availableMoves.fastTravel.map(node => (
+                          <button
+                            key={node.id}
+                            onClick={() => doMove(node.id, node.name)}
+                            disabled={loading}
+                            className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                            style={{
+                              border: `1px solid ${primaryColor}aa`,
+                              color: primaryColor,
+                            }}
+                          >
+                            <span className="hidden sm:inline">{terminology.move.toUpperCase()}: </span>{node.name}
+                          </button>
+                        ))}
 
-                    {availableMoves.advance.map(node => (
-                      <button
-                        key={node.id}
-                        onClick={() => doMove(node.id, node.name)}
-                        disabled={loading}
-                        className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
-                        style={{
-                          border: `1px solid ${semanticColors.pendingNode}88`,
-                          color: semanticColors.pendingNode,
-                        }}
-                      >
-                        &gt; {node.name}
-                      </button>
-                    ))}
+                        {availableMoves.advance.map(node => (
+                          <button
+                            key={node.id}
+                            onClick={() => doMove(node.id, node.name)}
+                            disabled={loading}
+                            className="px-2 sm:px-3 py-1 rounded text-[10px] sm:text-sm disabled:opacity-50 transition-colors"
+                            style={{
+                              border: `1px solid ${semanticColors.pendingNode}88`,
+                              color: semanticColors.pendingNode,
+                            }}
+                          >
+                            &gt; {node.name}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </>
                 )}
               </div>

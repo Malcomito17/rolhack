@@ -132,7 +132,7 @@ export function NetworkMapModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.9)' }}
       onClick={onClose}
     >
@@ -163,8 +163,9 @@ export function NetworkMapModal({
               {terminology.progress}: {stats.hacked}/{stats.total}
             </span>
             <button
+              type="button"
               onClick={onClose}
-              className="px-3 py-1 rounded text-sm font-mono transition-opacity hover:opacity-70"
+              className="px-3 py-1 rounded text-sm font-mono transition-opacity hover:opacity-70 cursor-pointer"
               style={{ border: `1px solid ${primaryColor}`, color: primaryColor }}
             >
               [X]

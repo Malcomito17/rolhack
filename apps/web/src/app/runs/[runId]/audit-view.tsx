@@ -133,7 +133,7 @@ export function AuditView({
   // TECH variant
   if (variant === 'TECH') {
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-cyber-dark border border-cyber-primary/30 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
           {/* Header */}
           <div className="border-b border-cyber-primary/20 px-6 py-4 flex items-center justify-between bg-cyber-darker">
@@ -152,6 +152,7 @@ export function AuditView({
               {/* Export button */}
               {canExport && (
                 <button
+                  type="button"
                   onClick={() => setShowExportModal(true)}
                   className="px-4 py-2 bg-cyber-accent/20 border border-cyber-accent/30 hover:bg-cyber-accent/30 text-cyber-accent rounded-lg font-mono text-sm transition-colors flex items-center gap-2"
                 >
@@ -163,8 +164,9 @@ export function AuditView({
               )}
               {/* Close button */}
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 text-gray-500 hover:text-white transition-colors"
+                className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -490,7 +492,7 @@ export function AuditView({
   const bgColor = theme?.bgColor || '#000000'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: `${bgColor}f0` }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ backgroundColor: `${bgColor}f0` }}>
       <div
         className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col rounded font-mono"
         style={{ border: `1px solid ${primaryColor}44`, backgroundColor: bgColor }}
@@ -508,16 +510,18 @@ export function AuditView({
           <div className="flex items-center gap-3">
             {canExport && (
               <button
+                type="button"
                 onClick={() => setShowExportModal(true)}
-                className="px-3 py-1 text-sm rounded"
+                className="px-3 py-1 text-sm rounded cursor-pointer"
                 style={{ border: `1px solid ${primaryColor}66`, color: primaryColor }}
               >
                 [EXPORT]
               </button>
             )}
             <button
+              type="button"
               onClick={onClose}
-              className="text-sm"
+              className="text-sm hover:opacity-70 transition-opacity cursor-pointer"
               style={{ color: `${textColor}66` }}
             >
               [X] CLOSE
